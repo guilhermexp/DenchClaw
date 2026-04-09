@@ -11,6 +11,9 @@ const {
 vi.mock("@/lib/composio", () => ({
   fetchComposioConnections: fetchComposioConnectionsMock,
   fetchComposioToolkits: fetchComposioToolkitsMock,
+  isComposioGatewayAuthError: vi.fn((error: unknown) =>
+    error instanceof Error && /HTTP (401|403)\b/.test(error.message),
+  ),
   resolveComposioApiKey: vi.fn(() => "dench_test_key"),
   resolveComposioEligibility: vi.fn(() => ({
     eligible: true,
@@ -117,5 +120,20 @@ describe("Composio connections API", () => {
       "dench_test_key",
       { limit: 100 },
     );
+  });
+
+  it("returns 401 when the gateway rejects the saved Composio API key", async () => {
+    fetchComposioConnectionsMock.mockRejectedValueOnce(
+      new Error("Failed to fetch connections (HTTP 401)"),
+    );
+
+    const { GET } = await import("./route");
+    const response = await GET(new Request("http://localhost/api/composio/connections?include_toolkits=1"));
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({
+      error: "Composio API key rejected by gateway. Update it and try again.",
+      code: "invalid_api_key",
+    });
   });
 });

@@ -96,7 +96,7 @@ function IntegrationCard({
   const statusText = isSaving
     ? "Saving..."
     : integration.locked
-      ? "Unavailable until Dench Cloud is ready"
+      ? "Unavailable until Dench credentials are configured"
       : description;
 
   return (

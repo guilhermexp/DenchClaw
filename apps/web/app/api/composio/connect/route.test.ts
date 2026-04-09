@@ -14,6 +14,9 @@ const {
 }));
 
 vi.mock("@/lib/composio", () => ({
+  isComposioGatewayAuthError: vi.fn((error: unknown) =>
+    error instanceof Error && /HTTP (401|403)\b/.test(error.message),
+  ),
   initiateComposioConnect: initiateComposioConnectMock,
   resolveComposioApiKey: resolveComposioApiKeyMock,
   resolveComposioEligibility: resolveComposioEligibilityMock,

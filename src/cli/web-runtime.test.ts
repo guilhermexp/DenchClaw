@@ -137,6 +137,59 @@ describe("installManagedWebRuntime backup", () => {
   });
 });
 
+describe("installManagedWebRuntime source checkout fallback", () => {
+  let tmpDir: string;
+  let stateDir: string;
+  let packageRoot: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(path.join(os.tmpdir(), "web-runtime-source-test-"));
+    stateDir = path.join(tmpDir, "state");
+    packageRoot = path.join(tmpDir, "pkg");
+    mkdirSync(path.join(packageRoot, "apps", "web"), { recursive: true });
+    writeFileSync(
+      path.join(packageRoot, "apps", "web", "package.json"),
+      '{"name":"denchclaw-web","private":true}',
+      "utf-8",
+    );
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("builds standalone on demand when the source checkout has no packaged web runtime", () => {
+    let buildAttempts = 0;
+
+    const result = installManagedWebRuntime({
+      stateDir,
+      packageRoot,
+      denchVersion: "2.0.0",
+      ensureStandaloneBuild(root) {
+        buildAttempts += 1;
+        const standaloneAppDir = path.join(
+          root,
+          "apps",
+          "web",
+          ".next",
+          "standalone",
+          "apps",
+          "web",
+        );
+        mkdirSync(path.join(standaloneAppDir, "node_modules"), { recursive: true });
+        writeFileSync(path.join(standaloneAppDir, "server.js"), "module.exports = {};", "utf-8");
+      },
+    });
+
+    expect(result.installed).toBe(true);
+    expect(buildAttempts).toBe(1);
+    if (!result.installed) {
+      throw new Error("expected install to succeed");
+    }
+    expect(existsSync(path.join(result.runtimeAppDir, "server.js"))).toBe(true);
+  });
+});
+
 describe("rollbackManagedWebRuntime", () => {
   let tmpDir: string;
 

@@ -1,6 +1,8 @@
 import { execFile } from "node:child_process";
+import { resolveComposioApiKeyState, type ComposioApiKeyState } from "@/lib/composio";
 import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
+import path from "node:path";
 import { promisify } from "node:util";
 import { resolveOpenClawStateDir } from "@/lib/workspace";
 
@@ -91,6 +93,7 @@ export type IntegrationsState = {
     isPrimaryProvider: boolean;
     primaryModel: string | null;
   };
+  composio: ComposioApiKeyState;
   metadata: DenchIntegrationMetadata;
   search: {
     builtIn: BuiltInSearchState;
@@ -138,6 +141,27 @@ type DenchCloudEligibility = {
 };
 
 type UnknownRecord = Record<string, unknown>;
+
+function readDenchAuthProfileKeyFromStateDir(): string | null {
+  const authProfilesPath = path.join(
+    resolveOpenClawStateDir(),
+    "agents",
+    "main",
+    "agent",
+    "auth-profiles.json",
+  );
+  if (!existsSync(authProfilesPath)) {
+    return null;
+  }
+  try {
+    const raw = JSON.parse(readFileSync(authProfilesPath, "utf-8")) as UnknownRecord;
+    const profiles = asRecord(raw.profiles);
+    const profile = asRecord(profiles?.["dench-cloud:default"]);
+    return readString(profile?.key) ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * The full openclaw.json parsed as an opaque record so that writes preserve
@@ -475,6 +499,9 @@ function resolveDenchAuth(config: OpenClawConfig): IntegrationAuthSummary {
   if (readString(provider?.apiKey)) {
     return { configured: true, source: "config" };
   }
+  if (readDenchAuthProfileKeyFromStateDir()) {
+    return { configured: true, source: "config" };
+  }
   if (process.env.DENCH_CLOUD_API_KEY?.trim() || process.env.DENCH_API_KEY?.trim()) {
     return { configured: true, source: "env" };
   }
@@ -486,6 +513,10 @@ function resolveDenchApiKey(config: OpenClawConfig): string | null {
   const provider = asRecord(asRecord(models?.providers)?.["dench-cloud"]);
   if (readString(provider?.apiKey)) {
     return readString(provider?.apiKey) ?? null;
+  }
+  const authProfileKey = readDenchAuthProfileKeyFromStateDir();
+  if (authProfileKey) {
+    return authProfileKey;
   }
   if (process.env.DENCH_CLOUD_API_KEY?.trim()) {
     return process.env.DENCH_CLOUD_API_KEY.trim();
@@ -519,22 +550,12 @@ function resolveDenchCloudEligibility(
       primaryModel,
       locked: true,
       lockReason: "missing_dench_key",
-      lockBadge: "Get Dench Cloud API Key",
-    };
-  }
-  if (!isPrimaryProvider) {
-    return {
-      hasKey: true,
-      isPrimaryProvider: false,
-      primaryModel,
-      locked: true,
-      lockReason: "dench_not_primary",
-      lockBadge: "Use Dench Cloud",
+      lockBadge: "Add Dench API Key",
     };
   }
   return {
     hasKey: true,
-    isPrimaryProvider: true,
+    isPrimaryProvider,
     primaryModel,
     locked: false,
     lockReason: null,
@@ -545,9 +566,9 @@ function resolveDenchCloudEligibility(
 function getLockErrorMessage(lockReason: DenchIntegrationLockReason | null): string {
   switch (lockReason) {
     case "missing_dench_key":
-      return "This integration requires a Dench Cloud API key.";
+      return "This integration requires a Dench API key.";
     case "dench_not_primary":
-      return "This integration requires Dench Cloud to be the primary provider.";
+      return "This integration requires Dench workspace credentials.";
     default:
       return "This integration is currently locked.";
   }
@@ -913,6 +934,7 @@ export function getIntegrationsState(): IntegrationsState {
       isPrimaryProvider: eligibility.isPrimaryProvider,
       primaryModel: eligibility.primaryModel,
     },
+    composio: resolveComposioApiKeyState(),
     metadata: {
       schemaVersion: 1,
       exa: {

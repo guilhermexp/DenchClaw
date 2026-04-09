@@ -1,5 +1,6 @@
 import {
   fetchComposioToolkits,
+  isComposioGatewayAuthError,
   type ComposioToolkitsResponse,
   resolveComposioApiKey,
   resolveComposioEligibility,
@@ -66,7 +67,7 @@ export async function GET(request: Request) {
   const apiKey = resolveComposioApiKey();
   if (!apiKey) {
     return Response.json(
-      { error: "Dench Cloud API key is required." },
+      { error: "Composio API key is required.", code: "missing_api_key" },
       { status: 403 },
     );
   }
@@ -75,7 +76,8 @@ export async function GET(request: Request) {
   if (!eligibility.eligible) {
     return Response.json(
       {
-        error: "Dench Cloud must be the primary provider.",
+        error: "Composio API key is required.",
+        code: "missing_api_key",
         lockReason: eligibility.lockReason,
         lockBadge: eligibility.lockBadge,
       },
@@ -109,6 +111,16 @@ export async function GET(request: Request) {
     });
     return Response.json(data);
   } catch (err) {
+    if (isComposioGatewayAuthError(err)) {
+      return Response.json(
+        {
+          error: "Composio API key rejected by gateway. Update it and try again.",
+          code: "invalid_api_key",
+        },
+        { status: 401 },
+      );
+    }
+
     return Response.json(
       { error: err instanceof Error ? err.message : "Failed to fetch toolkits." },
       { status: 502 },

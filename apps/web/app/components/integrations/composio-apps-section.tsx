@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../ui/button";
+import { Input } from "../ui/input";
 import { ComposioAppCard } from "./composio-app-card";
 import { ComposioConnectModal } from "./composio-connect-modal";
 import type {
@@ -182,10 +183,14 @@ type ComposioMcpStatus = {
 
 export function ComposioAppsSection({
   eligible,
+  hasDedicatedApiKey,
   lockBadge,
+  onApiKeySaved,
 }: {
   eligible: boolean;
+  hasDedicatedApiKey?: boolean;
   lockBadge: string | null;
+  onApiKeySaved?: () => void | Promise<void>;
 }) {
   const [state, setState] = useState<ComposioAppsState>(buildInitialState);
   const [marketplaceSearch, setMarketplaceSearch] = useState("");
@@ -196,6 +201,11 @@ export function ComposioAppsSection({
   const [mcpStatus, setMcpStatus] = useState<ComposioMcpStatus | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [repairingMcp, setRepairingMcp] = useState(false);
+  const [composioApiKey, setComposioApiKey] = useState("");
+  const [savingComposioApiKey, setSavingComposioApiKey] = useState(false);
+  const [composioApiKeyError, setComposioApiKeyError] = useState<string | null>(null);
+  const [composioApiKeySuccess, setComposioApiKeySuccess] = useState<string | null>(null);
+  const [apiKeyUpdateRequired, setApiKeyUpdateRequired] = useState<string | null>(null);
   const [optimisticConnectedToolkits, setOptimisticConnectedToolkits] = useState<ComposioToolkit[]>([]);
   const initialFetchStartedRef = useRef(false);
   const marketplaceRequestKeyRef = useRef("");
@@ -216,9 +226,13 @@ export function ComposioAppsSection({
     const response = await fetch(`/api/composio/toolkits${suffix ? `?${suffix}` : ""}`);
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
-      throw new Error(
-        (err as { error?: string }).error ?? `Failed to load apps (${response.status})`,
-      );
+      const message = (err as { error?: string }).error ?? `Failed to load apps (${response.status})`;
+      if (response.status === 401 || response.status === 403) {
+        const authError = new Error(message) as Error & { code?: string };
+        authError.code = "composio_auth";
+        throw authError;
+      }
+      throw new Error(message);
     }
     return extractComposioToolkits(
       (await response.json()) as ComposioToolkitsResponse,
@@ -263,33 +277,8 @@ export function ComposioAppsSection({
       error: null,
       connectionsError: null,
     }));
+    setApiKeyUpdateRequired(null);
     setStatusError(null);
-
-    const marketplacePreFetch = fetchToolkitsPage({ limit: MARKETPLACE_PAGE_SIZE })
-      .then((result) => {
-        const featuredSet = new Set(FEATURED_SLUGS);
-        const ordered = [
-          ...result.items
-            .filter((toolkit) => featuredSet.has(toolkit.slug))
-            .sort((left, right) => FEATURED_SLUGS.indexOf(left.slug) - FEATURED_SLUGS.indexOf(right.slug)),
-          ...result.items.filter((toolkit) => !featuredSet.has(toolkit.slug)),
-        ];
-        setState((prev) => {
-          if (prev.marketplaceReady) {
-            return prev;
-          }
-          return {
-            ...prev,
-            marketplaceToolkits: ordered,
-            marketplaceCursor: result.cursor,
-            categories: result.categories,
-            marketplaceReady: true,
-            marketplaceLoading: false,
-          };
-        });
-        marketplaceRequestKeyRef.current = `::`;
-      })
-      .catch(() => {});
 
     try {
       const connectionsRes = await fetch(
@@ -306,6 +295,18 @@ export function ComposioAppsSection({
         const err = await connectionsRes.json().catch(() => ({}));
         connectionsError = (err as { error?: string }).error
           ?? `Failed to load connections (${connectionsRes.status})`;
+        if (connectionsRes.status === 401 || connectionsRes.status === 403) {
+          setApiKeyUpdateRequired(connectionsError);
+          setState((prev) => ({
+            ...prev,
+            loading: false,
+            error: null,
+            connectionsError,
+            marketplaceLoading: false,
+            loadingMore: false,
+          }));
+          return;
+        }
       }
 
       const extractedConnections = extractComposioConnections(connectionsData);
@@ -333,8 +334,53 @@ export function ComposioAppsSection({
       window.setTimeout(() => {
         void fetchMcpStatus();
       }, 0);
-      void marketplacePreFetch;
+      void fetchToolkitsPage({ limit: MARKETPLACE_PAGE_SIZE })
+        .then((result) => {
+          const featuredSet = new Set(FEATURED_SLUGS);
+          const ordered = [
+            ...result.items
+              .filter((toolkit) => featuredSet.has(toolkit.slug))
+              .sort((left, right) => FEATURED_SLUGS.indexOf(left.slug) - FEATURED_SLUGS.indexOf(right.slug)),
+            ...result.items.filter((toolkit) => !featuredSet.has(toolkit.slug)),
+          ];
+          setState((prev) => {
+            if (prev.marketplaceReady) {
+              return prev;
+            }
+            return {
+              ...prev,
+              marketplaceToolkits: ordered,
+              marketplaceCursor: result.cursor,
+              categories: result.categories,
+              marketplaceReady: true,
+              marketplaceLoading: false,
+            };
+          });
+          marketplaceRequestKeyRef.current = `::`;
+        })
+        .catch((error: unknown) => {
+          if (error instanceof Error && "code" in error && error.code === "composio_auth") {
+            setApiKeyUpdateRequired(error.message);
+            setState((prev) => ({
+              ...prev,
+              marketplaceLoading: false,
+              loadingMore: false,
+            }));
+          }
+        });
     } catch (err) {
+      if (err instanceof Error && "code" in err && err.code === "composio_auth") {
+        setApiKeyUpdateRequired(err.message);
+        setState((prev) => ({
+          ...prev,
+          loading: false,
+          error: null,
+          connectionsError: err.message,
+          marketplaceLoading: false,
+          loadingMore: false,
+        }));
+        return;
+      }
       setMcpStatus(null);
       setState((prev) => ({
         ...prev,
@@ -414,6 +460,17 @@ export function ComposioAppsSection({
       if (marketplaceRequestKeyRef.current !== queryKey) {
         return;
       }
+      if (err instanceof Error && "code" in err && err.code === "composio_auth") {
+        setApiKeyUpdateRequired(err.message);
+        setState((prev) => ({
+          ...prev,
+          marketplaceLoading: false,
+          marketplaceReady: true,
+          loadingMore: false,
+          error: null,
+        }));
+        return;
+      }
       setState((prev) => ({
         ...prev,
         marketplaceLoading: false,
@@ -432,7 +489,7 @@ export function ComposioAppsSection({
   }, [marketplaceSearch]);
 
   useEffect(() => {
-    if (eligible) {
+    if (eligible && !apiKeyUpdateRequired) {
       if (initialFetchStartedRef.current) {
         return;
       }
@@ -442,10 +499,10 @@ export function ComposioAppsSection({
       initialFetchStartedRef.current = false;
       setState((prev) => ({ ...prev, loading: false }));
     }
-  }, [eligible, fetchData]);
+  }, [apiKeyUpdateRequired, eligible, fetchData]);
 
   useEffect(() => {
-    if (!eligible || state.loading) {
+    if (!eligible || state.loading || apiKeyUpdateRequired) {
       return;
     }
 
@@ -458,6 +515,7 @@ export function ComposioAppsSection({
     eligible,
     loadMarketplace,
     debouncedMarketplaceSearch,
+    apiKeyUpdateRequired,
     state.loading,
     state.marketplaceReady,
   ]);
@@ -631,9 +689,50 @@ export function ComposioAppsSection({
     }
   }, []);
 
+  const handleSaveComposioApiKey = useCallback(async () => {
+    if (!composioApiKey.trim()) {
+      setComposioApiKeyError("Enter a Composio API key.");
+      setComposioApiKeySuccess(null);
+      return;
+    }
+
+    setSavingComposioApiKey(true);
+    setComposioApiKeyError(null);
+    setComposioApiKeySuccess(null);
+
+    try {
+      const response = await fetch("/api/integrations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ composioApiKey: composioApiKey.trim() }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setComposioApiKeyError(
+          (payload as { error?: string }).error ?? "Failed to save Composio API key.",
+        );
+        return;
+      }
+      setComposioApiKey("");
+      setApiKeyUpdateRequired(null);
+      setComposioApiKeySuccess("Composio API key saved.");
+      await onApiKeySaved?.();
+      if (hasDedicatedApiKey || eligible) {
+        void fetchData({ fresh: true });
+      }
+    } catch (err) {
+      setComposioApiKeyError(
+        err instanceof Error ? err.message : "Failed to save Composio API key.",
+      );
+    } finally {
+      setSavingComposioApiKey(false);
+    }
+  }, [composioApiKey]);
+
   useEffect(() => {
     if (
       !eligible
+      || apiKeyUpdateRequired !== null
       || state.loading
       || state.marketplaceLoading
       || state.loadingMore
@@ -655,6 +754,7 @@ export function ComposioAppsSection({
     return () => observer.disconnect();
   }, [
     eligible,
+    apiKeyUpdateRequired,
     loadMarketplace,
     state.loading,
     state.loadingMore,
@@ -663,19 +763,23 @@ export function ComposioAppsSection({
     state.marketplaceReady,
   ]);
 
-  if (!eligible) {
+  const showApiKeySetup = !eligible || apiKeyUpdateRequired !== null;
+
+  if (showApiKeySetup) {
     return (
       <div>
         <div
-          className="flex items-center justify-center rounded-2xl px-6 py-10"
+          className="rounded-2xl px-6 py-6"
           style={{
             background: "var(--color-surface)",
             border: "1px solid var(--color-border)",
           }}
         >
-          <div className="text-center">
+          <div className="mx-auto max-w-md text-center">
             <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-              Available with Dench Cloud
+              {apiKeyUpdateRequired
+                ? "Your saved Composio API key was rejected. Update it to reconnect apps."
+                : "Add your Composio API key to connect apps from this workspace."}
             </p>
             {lockBadge && (
               <span
@@ -689,6 +793,47 @@ export function ComposioAppsSection({
                 {lockBadge}
               </span>
             )}
+            <div className="mt-4 text-left">
+              <label
+                htmlFor="composio-api-key"
+                className="mb-2 block text-xs font-medium"
+                style={{ color: "var(--color-text)" }}
+              >
+                Composio API key
+              </label>
+              <Input
+                id="composio-api-key"
+                type="password"
+                value={composioApiKey}
+                onChange={(event) => setComposioApiKey(event.target.value)}
+                placeholder="composio_..."
+                autoComplete="off"
+              />
+              {apiKeyUpdateRequired && (
+                <p className="mt-2 text-xs" style={{ color: "var(--color-error, #ef4444)" }}>
+                  {apiKeyUpdateRequired}
+                </p>
+              )}
+              {composioApiKeyError && (
+                <p className="mt-2 text-xs" style={{ color: "var(--color-error, #ef4444)" }}>
+                  {composioApiKeyError}
+                </p>
+              )}
+              {composioApiKeySuccess && (
+                <p className="mt-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
+                  {composioApiKeySuccess}
+                </p>
+              )}
+              <div className="mt-3 flex justify-center">
+                <Button
+                  type="button"
+                  onClick={() => void handleSaveComposioApiKey()}
+                  disabled={savingComposioApiKey}
+                >
+                  {savingComposioApiKey ? "Saving..." : "Save API key"}
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       </div>

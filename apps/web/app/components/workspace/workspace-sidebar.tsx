@@ -78,8 +78,8 @@ type WorkspaceSidebarProps = {
   /** Which tab is active. Controlled from parent if provided. */
   activeTab?: "files" | "chats";
   onTabChange?: (tab: "files" | "chats") => void;
-  /** Navigate to a sidebar section (cloud, integrations, skills, cron). */
-  onNavigate?: (target: "cloud" | "integrations" | "skills" | "cron") => void;
+  /** Navigate to a sidebar section (cloud, ai-models, integrations, skills, cron). */
+  onNavigate?: (target: "cloud" | "ai-models" | "integrations" | "skills" | "cron") => void;
 };
 
 function HomeIcon() {
@@ -580,6 +580,13 @@ export function WorkspaceSidebar({
 					{ id: "cloud" as const, label: "Cloud", icon: (
 						<svg className="h-4 w-4 shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
 							<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
+						</svg>
+					)},
+					{ id: "ai-models" as const, label: "AI Models", icon: (
+						<svg className="h-4 w-4 shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+							<path d="M12 2 3 7l9 5 9-5-9-5Z" />
+							<path d="m3 17 9 5 9-5" />
+							<path d="m3 12 9 5 9-5" />
 						</svg>
 					)},
 					{ id: "integrations" as const, label: "Integrations", icon: (

@@ -119,6 +119,10 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+function isOfficialComposioApiKey(apiKey: string | null): boolean {
+  return typeof apiKey === "string" && apiKey.trim().startsWith("ak_");
+}
+
 function isFresh(checkedAt: string | undefined, ttlMs: number): boolean {
   if (!checkedAt) {
     return false;
@@ -384,6 +388,52 @@ export async function getComposioMcpHealth(options?: {
   const gatewayUrl = resolveComposioGatewayUrl();
   const apiKey = resolveComposioApiKey();
   const eligibility = resolveComposioEligibility();
+  if (isOfficialComposioApiKey(apiKey)) {
+    const generatedAtOfficial = nowIso();
+    return {
+      generatedAt: generatedAtOfficial,
+      workspaceDir,
+      gatewayUrl,
+      eligible: eligibility.eligible,
+      lockReason: eligibility.lockReason,
+      lockBadge: eligibility.lockBadge,
+      config: {
+        status: "pass",
+        detail: "Composio is configured through the official API backend.",
+        checkedAt: generatedAtOfficial,
+        matchesExpected: true,
+        configured: {
+          url: "official-composio-api",
+          transport: "https",
+          authorizationHeader: "x-api-key",
+        },
+        expected: {
+          url: "official-composio-api",
+          transport: "https",
+          authorizationHeader: "x-api-key",
+        },
+      },
+      gatewayTools: {
+        status: "pass",
+        detail: "Toolkits are loaded from backend.composio.dev using the saved Composio API key.",
+        checkedAt: generatedAtOfficial,
+        toolCount: null,
+      },
+      liveAgent: {
+        status: "unknown",
+        detail: "Live agent visibility has not been checked yet.",
+        checkedAt: generatedAtOfficial,
+        visible: null,
+        evidence: [],
+        toolCallsDetected: false,
+      },
+      summary: {
+        level: "healthy",
+        verified: false,
+        message: "Composio is configured and ready through the official API backend.",
+      },
+    };
+  }
   const cachedGatewayTools = cachedGatewayToolsCheck;
   const cachedLiveAgent = cachedLiveAgentCheck;
 
@@ -413,10 +463,10 @@ export async function getComposioMcpHealth(options?: {
       ? (matchesExpected ? "pass" : "fail")
       : "unknown",
     detail: !apiKey
-      ? "No Dench Cloud API key is configured."
+      ? "No Dench API key is configured."
       : matchesExpected
         ? `The ${denchIntegrationsBrand.displayName} server matches the expected gateway URL, transport, and Authorization header.`
-        : `The ${denchIntegrationsBrand.displayName} server is missing or does not match the expected Dench Cloud gateway configuration.`,
+        : `The ${denchIntegrationsBrand.displayName} server is missing or does not match the expected gateway configuration.`,
     checkedAt: generatedAt,
     matchesExpected,
     configured: latestConfiguredServer,

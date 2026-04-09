@@ -1,10 +1,19 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import { join } from "node:path";
 import { resolveOpenClawStateDir } from "@/lib/workspace";
 import { normalizeComposioToolkitSlug } from "@/lib/composio-normalization";
 import { readConfiguredDenchCloudSettings } from "../../../src/cli/dench-cloud";
 
 const DEFAULT_GATEWAY_URL = "https://gateway.merseoriginals.com";
+const COMPOSIO_API_V3 = "https://backend.composio.dev/api/v3";
+const AGENTS_DEV_COMPOSIO_STORE = path.join(
+  process.env.HOME ?? "",
+  "Library",
+  "Application Support",
+  "Agents Dev",
+  "composio-profiles.json",
+);
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -161,6 +170,35 @@ export type ComposioConnectResponse = {
   connection_id: string | null;
 };
 
+export type ComposioProfile = {
+  id: string;
+  name: string;
+  toolkit_slug: string;
+  toolkit_name: string;
+  mcp_url: string;
+  redirect_url: string | null;
+  connected_account_id: string;
+  is_connected: boolean;
+  created_at: string;
+};
+
+export type StoredComposioProfile = ComposioProfile & {
+  enabled_tools: string[];
+};
+
+export type ComposioApiKeySource =
+  | "composio_config"
+  | "dench_config"
+  | "auth_profile"
+  | "env"
+  | "missing";
+
+export type ComposioApiKeyState = {
+  hasApiKey: boolean;
+  hasDedicatedApiKey: boolean;
+  apiKeySource: ComposioApiKeySource;
+};
+
 export type ComposioState = {
   eligible: boolean;
   lockReason: "missing_dench_key" | "dench_not_primary" | null;
@@ -302,13 +340,164 @@ export function normalizeComposioConnections(
 // Config resolution (mirrors integrations.ts patterns)
 // ---------------------------------------------------------------------------
 
+function configPath(): string {
+  return join(resolveOpenClawStateDir(), "openclaw.json");
+}
+
 function readConfig(): UnknownRecord {
-  const configPath = join(resolveOpenClawStateDir(), "openclaw.json");
-  if (!existsSync(configPath)) return {};
+  const currentConfigPath = configPath();
+  if (!existsSync(currentConfigPath)) return {};
   try {
-    return (JSON.parse(readFileSync(configPath, "utf-8")) as UnknownRecord) ?? {};
+    return (JSON.parse(readFileSync(currentConfigPath, "utf-8")) as UnknownRecord) ?? {};
   } catch {
     return {};
+  }
+}
+
+function writeConfig(config: UnknownRecord): void {
+  const stateDir = resolveOpenClawStateDir();
+  const currentConfigPath = configPath();
+  if (!existsSync(stateDir)) {
+    mkdirSync(stateDir, { recursive: true });
+  }
+  const next = JSON.stringify(config, null, 2) + "\n";
+  writeFileSync(currentConfigPath, next, "utf-8");
+}
+
+type ComposioStore = {
+  config: {
+    api_key: string;
+    webhook_secret: string;
+  };
+  profiles: StoredComposioProfile[];
+};
+
+const DEFAULT_COMPOSIO_STORE: ComposioStore = {
+  config: {
+    api_key: "",
+    webhook_secret: "",
+  },
+  profiles: [],
+};
+
+function composioProfilesPath(): string {
+  return join(resolveOpenClawStateDir(), "composio-profiles.json");
+}
+
+function readComposioStoreFromPath(storePath: string): ComposioStore | null {
+  if (!existsSync(storePath)) {
+    return null;
+  }
+  try {
+    const raw = JSON.parse(readFileSync(storePath, "utf-8")) as UnknownRecord;
+    const config = asRecord(raw.config);
+    const profiles = Array.isArray(raw.profiles)
+      ? raw.profiles.filter((item): item is StoredComposioProfile =>
+        Boolean(item) && typeof item === "object" && !Array.isArray(item))
+      : [];
+    return {
+      config: {
+        api_key: readString(config?.api_key) ?? "",
+        webhook_secret: readString(config?.webhook_secret) ?? "",
+      },
+      profiles,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function readComposioStore(): ComposioStore {
+  return readComposioStoreFromPath(composioProfilesPath()) ?? DEFAULT_COMPOSIO_STORE;
+}
+
+function writeComposioStore(store: ComposioStore): void {
+  const stateDir = resolveOpenClawStateDir();
+  if (!existsSync(stateDir)) {
+    mkdirSync(stateDir, { recursive: true });
+  }
+  writeFileSync(composioProfilesPath(), JSON.stringify(store, null, 2) + "\n", "utf-8");
+}
+
+function getComposioStoredApiKey(): string | null {
+  const localApiKey = readComposioStore().config.api_key.trim();
+  if (localApiKey) {
+    return localApiKey;
+  }
+  const externalStore = readComposioStoreFromPath(AGENTS_DEV_COMPOSIO_STORE);
+  const externalApiKey = externalStore?.config.api_key.trim() ?? "";
+  return externalApiKey || null;
+}
+
+function upsertComposioProfile(profile: ComposioProfile, enabledTools: string[] = []): StoredComposioProfile {
+  const store = readComposioStore();
+  const nextProfile: StoredComposioProfile = { ...profile, enabled_tools: enabledTools };
+  const existingIndex = store.profiles.findIndex(
+    (item) => item.connected_account_id === profile.connected_account_id,
+  );
+  if (existingIndex >= 0) {
+    store.profiles[existingIndex] = nextProfile;
+  } else {
+    store.profiles.push(nextProfile);
+  }
+  writeComposioStore(store);
+  return nextProfile;
+}
+
+function updateStoredComposioProfileConnection(
+  connectedAccountId: string,
+  isConnected: boolean,
+): StoredComposioProfile | null {
+  const store = readComposioStore();
+  const existingIndex = store.profiles.findIndex(
+    (item) => item.connected_account_id === connectedAccountId,
+  );
+  if (existingIndex === -1) {
+    return null;
+  }
+  store.profiles[existingIndex] = {
+    ...store.profiles[existingIndex]!,
+    is_connected: isConnected,
+  };
+  writeComposioStore(store);
+  return store.profiles[existingIndex] ?? null;
+}
+
+function deleteStoredComposioProfileByConnectionId(connectedAccountId: string): boolean {
+  const store = readComposioStore();
+  const nextProfiles = store.profiles.filter(
+    (item) => item.connected_account_id !== connectedAccountId,
+  );
+  if (nextProfiles.length === store.profiles.length) {
+    return false;
+  }
+  store.profiles = nextProfiles;
+  writeComposioStore(store);
+  return true;
+}
+
+function getStoredComposioProfiles(): StoredComposioProfile[] {
+  return readComposioStore().profiles;
+}
+
+function readDenchAuthProfileKey(): string | null {
+  const authProfilesPath = path.join(
+    resolveOpenClawStateDir(),
+    "agents",
+    "main",
+    "agent",
+    "auth-profiles.json",
+  );
+  if (!existsSync(authProfilesPath)) {
+    return null;
+  }
+  try {
+    const raw = JSON.parse(readFileSync(authProfilesPath, "utf-8")) as UnknownRecord;
+    const profiles = asRecord(raw.profiles);
+    const profile = asRecord(profiles?.["dench-cloud:default"]);
+    return readString(profile?.key) ?? null;
+  } catch {
+    return null;
   }
 }
 
@@ -326,12 +515,81 @@ export function resolveComposioGatewayUrl(): string {
   );
 }
 
-export function resolveComposioApiKey(): string | null {
+export function resolveComposioApiKeyState(): ComposioApiKeyState {
+  const storedApiKey = getComposioStoredApiKey();
+  if (storedApiKey) {
+    return {
+      hasApiKey: true,
+      hasDedicatedApiKey: true,
+      apiKeySource: "composio_config",
+    };
+  }
+
   const config = readConfig();
+  const composio = asRecord(config.composio);
+  const dedicatedApiKey = readString(composio?.apiKey);
+  if (dedicatedApiKey) {
+    return {
+      hasApiKey: true,
+      hasDedicatedApiKey: true,
+      apiKeySource: "composio_config",
+    };
+  }
+
+  const models = asRecord(config.models);
+  const provider = asRecord(asRecord(models?.providers)?.["dench-cloud"]);
+  if (readString(provider?.apiKey)) {
+    return {
+      hasApiKey: true,
+      hasDedicatedApiKey: false,
+      apiKeySource: "dench_config",
+    };
+  }
+
+  const authProfileKey = readDenchAuthProfileKey();
+  if (authProfileKey) {
+    return {
+      hasApiKey: true,
+      hasDedicatedApiKey: false,
+      apiKeySource: "auth_profile",
+    };
+  }
+
+  if (process.env.DENCH_CLOUD_API_KEY?.trim() || process.env.DENCH_API_KEY?.trim()) {
+    return {
+      hasApiKey: true,
+      hasDedicatedApiKey: false,
+      apiKeySource: "env",
+    };
+  }
+
+  return {
+    hasApiKey: false,
+    hasDedicatedApiKey: false,
+    apiKeySource: "missing",
+  };
+}
+
+export function resolveComposioApiKey(): string | null {
+  const storedApiKey = getComposioStoredApiKey();
+  if (storedApiKey) {
+    return storedApiKey;
+  }
+
+  const config = readConfig();
+  const composio = asRecord(config.composio);
+  const dedicatedApiKey = readString(composio?.apiKey);
+  if (dedicatedApiKey) {
+    return dedicatedApiKey;
+  }
   const models = asRecord(config.models);
   const provider = asRecord(asRecord(models?.providers)?.["dench-cloud"]);
   if (readString(provider?.apiKey)) {
     return readString(provider?.apiKey) ?? null;
+  }
+  const authProfileKey = readDenchAuthProfileKey();
+  if (authProfileKey) {
+    return authProfileKey;
   }
   if (process.env.DENCH_CLOUD_API_KEY?.trim()) {
     return process.env.DENCH_CLOUD_API_KEY.trim();
@@ -340,6 +598,20 @@ export function resolveComposioApiKey(): string | null {
     return process.env.DENCH_API_KEY.trim();
   }
   return null;
+}
+
+export function setComposioApiKey(apiKey: string): ComposioApiKeyState {
+  const trimmedApiKey = apiKey.trim();
+  const store = readComposioStore();
+  store.config.api_key = trimmedApiKey;
+  writeComposioStore(store);
+  const config = readConfig();
+  config.composio = {
+    ...(asRecord(config.composio) ?? {}),
+    apiKey: trimmedApiKey,
+  };
+  writeConfig(config);
+  return resolveComposioApiKeyState();
 }
 
 export function resolveComposioEligibility(): {
@@ -353,23 +625,14 @@ export function resolveComposioEligibility(): {
     return {
       eligible: false,
       lockReason: "missing_dench_key",
-      lockBadge: "Get Dench Cloud API Key",
+      lockBadge: "Add Composio API Key",
     };
   }
-  const agents = asRecord(config.agents);
-  const defaults = asRecord(agents?.defaults);
-  const model = defaults?.model;
-  const primary = typeof model === "string"
-    ? readString(model)
-    : readString(asRecord(model)?.primary);
-  if (!primary?.startsWith("dench-cloud/")) {
-    return {
-      eligible: false,
-      lockReason: "dench_not_primary",
-      lockBadge: "Use Dench Cloud",
-    };
-  }
-  return { eligible: true, lockReason: null, lockBadge: null };
+  return {
+    eligible: true,
+    lockReason: null,
+    lockBadge: null,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -388,6 +651,21 @@ async function gatewayFetch(
     headers: {
       "content-type": "application/json",
       authorization: `Bearer ${apiKey}`,
+      ...init?.headers,
+    },
+  });
+}
+
+async function composioApiFetch(
+  path: string,
+  apiKey: string,
+  init?: RequestInit,
+): Promise<Response> {
+  return fetch(`${COMPOSIO_API_V3}${path}`, {
+    ...init,
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": apiKey,
       ...init?.headers,
     },
   });
@@ -417,7 +695,7 @@ function normalizeToolkitsEnvelope(raw: ComposioToolkitsResponse): ComposioToolk
 }
 
 export async function fetchComposioToolkits(
-  gatewayUrl: string,
+  _gatewayUrl: string,
   apiKey: string,
   options?: FetchToolkitsOptions,
 ): Promise<ComposioToolkitsResponse> {
@@ -427,8 +705,8 @@ export async function fetchComposioToolkits(
   if (options?.cursor) params.set("cursor", options.cursor);
   if (options?.limit) params.set("limit", String(options.limit));
   const qs = params.toString();
-  const path = `/v1/composio/toolkits${qs ? `?${qs}` : ""}`;
-  const res = await gatewayFetch(gatewayUrl, apiKey, path);
+  const path = `/toolkits${qs ? `?${qs}` : ""}`;
+  const res = await composioApiFetch(path, apiKey);
   if (!res.ok) {
     throw new Error(`Failed to fetch toolkits (HTTP ${res.status})`);
   }
@@ -437,50 +715,205 @@ export async function fetchComposioToolkits(
 }
 
 export async function fetchComposioConnections(
-  gatewayUrl: string,
+  _gatewayUrl: string,
   apiKey: string,
 ): Promise<ComposioConnectionsResponse> {
-  const res = await gatewayFetch(gatewayUrl, apiKey, "/v1/composio/connections");
-  if (!res.ok) {
-    throw new Error(`Failed to fetch connections (HTTP ${res.status})`);
+  const profiles = getStoredComposioProfiles();
+  const refreshedProfiles = await Promise.all(
+    profiles.map(async (profile) => {
+      try {
+        const response = await composioApiFetch(
+          `/connected_accounts/${encodeURIComponent(profile.connected_account_id)}`,
+          apiKey,
+        );
+        if (!response.ok) {
+          throw new Error(`Failed to fetch connection (HTTP ${response.status})`);
+        }
+        const payload = (await response.json()) as UnknownRecord;
+        const isConnected =
+          pickString(payload.status)?.toUpperCase() === "ACTIVE"
+          || payload.is_connected === true;
+        return updateStoredComposioProfileConnection(profile.connected_account_id, isConnected)
+          ?? { ...profile, is_connected: isConnected };
+      } catch {
+        return profile;
+      }
+    }),
+  );
+
+  return {
+    connections: refreshedProfiles.map((profile) => ({
+      id: profile.connected_account_id,
+      toolkit_slug: profile.toolkit_slug,
+      toolkit_name: profile.toolkit_name,
+      status: profile.is_connected ? "ACTIVE" : "INITIATED",
+      created_at: profile.created_at,
+      updated_at: null,
+      account_label: profile.name,
+      account_name: profile.name,
+      account_email: null,
+      external_account_id: profile.connected_account_id,
+      account_stable_id: profile.id,
+    })),
+    raw: refreshedProfiles,
+  };
+}
+
+export async function validateComposioApiKey(apiKey: string): Promise<void> {
+  await fetchComposioToolkits(resolveComposioGatewayUrl(), apiKey, { limit: 1 });
+}
+
+export function isComposioGatewayAuthError(error: unknown): boolean {
+  return error instanceof Error && /HTTP (401|403)\b/.test(error.message);
+}
+
+function generateComposioServerName(toolkitName: string): string {
+  const clean = toolkitName
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+  const suffix = Math.random().toString(36).slice(2, 10);
+  const candidate = `${clean}-${suffix}`;
+  if (candidate.length <= 30) {
+    return candidate.length < 4 ? `app-${suffix}` : candidate;
   }
-  return res.json() as Promise<ComposioConnectionsResponse>;
+  return `${clean.slice(0, 30 - suffix.length - 1)}-${suffix}`;
 }
 
 export async function initiateComposioConnect(
-  gatewayUrl: string,
+  _gatewayUrl: string,
   apiKey: string,
   toolkit: string,
-  callbackUrl: string,
+  _callbackUrl: string,
 ): Promise<ComposioConnectResponse> {
-  const res = await gatewayFetch(gatewayUrl, apiKey, "/v1/composio/connect", {
+  const toolkitRes = await composioApiFetch(`/toolkits/${encodeURIComponent(toolkit)}`, apiKey);
+  if (!toolkitRes.ok) {
+    throw new Error(`Failed to verify toolkit (HTTP ${toolkitRes.status})`);
+  }
+  const toolkitPayload = (await toolkitRes.json()) as UnknownRecord;
+  const toolkitName = pickString(
+    toolkitPayload.name,
+    toolkitPayload.displayName,
+    toolkit,
+  ) ?? toolkit;
+
+  const authConfigRes = await composioApiFetch("/auth_configs", apiKey, {
     method: "POST",
-    body: JSON.stringify({ toolkit, callback_url: callbackUrl }),
+    body: JSON.stringify({
+      toolkit: { slug: toolkit },
+      auth_config: {
+        type: "use_composio_managed_auth",
+        credentials: {},
+      },
+    }),
   });
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
+  if (!authConfigRes.ok) {
+    const detail = await authConfigRes.text().catch(() => "");
     throw new Error(
-      `Failed to initiate connection for ${toolkit} (HTTP ${res.status})${detail ? `: ${detail}` : ""}`,
+      `Failed to create auth config (HTTP ${authConfigRes.status})${detail ? `: ${detail}` : ""}`,
     );
   }
-  return res.json() as Promise<ComposioConnectResponse>;
+  const authConfigData = (await authConfigRes.json()) as UnknownRecord;
+  const authConfig = asRecord(authConfigData.auth_config) ?? authConfigData;
+  const authConfigId = pickString(authConfig.id, authConfigData.id);
+  if (!authConfigId) {
+    throw new Error("Failed to create auth config.");
+  }
+
+  const userId = `dench-web-${Date.now()}`;
+  const connectedAccountRes = await composioApiFetch("/connected_accounts", apiKey, {
+    method: "POST",
+    body: JSON.stringify({
+      auth_config: { id: authConfigId },
+      connection: { entity_id: userId },
+    }),
+  });
+  if (!connectedAccountRes.ok) {
+    const detail = await connectedAccountRes.text().catch(() => "");
+    throw new Error(
+      `Failed to create connected account (HTTP ${connectedAccountRes.status})${detail ? `: ${detail}` : ""}`,
+    );
+  }
+  const connectedAccountData = (await connectedAccountRes.json()) as UnknownRecord;
+  const connectedAccountId = pickString(connectedAccountData.id);
+  const redirectUrl = pickString(
+    connectedAccountData.redirect_url,
+    connectedAccountData.redirect_uri,
+    connectedAccountData.redirectUrl,
+  ) ?? "";
+  if (!connectedAccountId || !redirectUrl) {
+    throw new Error("Failed to create connected account.");
+  }
+
+  const mcpServerRes = await composioApiFetch("/mcp/servers", apiKey, {
+    method: "POST",
+    body: JSON.stringify({
+      auth_config_ids: [authConfigId],
+      name: generateComposioServerName(toolkitName),
+      allowed_tools: [],
+    }),
+  });
+  if (!mcpServerRes.ok) {
+    const detail = await mcpServerRes.text().catch(() => "");
+    throw new Error(
+      `Failed to create MCP server (HTTP ${mcpServerRes.status})${detail ? `: ${detail}` : ""}`,
+    );
+  }
+  const mcpServerData = (await mcpServerRes.json()) as UnknownRecord;
+  const mcpServerId = pickString(mcpServerData.id);
+  if (!mcpServerId) {
+    throw new Error("Failed to create MCP server.");
+  }
+
+  const mcpUrlRes = await composioApiFetch("/mcp/servers/generate", apiKey, {
+    method: "POST",
+    body: JSON.stringify({
+      mcp_server_id: mcpServerId,
+      connected_account_ids: [connectedAccountId],
+      user_ids: [userId],
+    }),
+  });
+  if (!mcpUrlRes.ok) {
+    const detail = await mcpUrlRes.text().catch(() => "");
+    throw new Error(
+      `Failed to generate MCP url (HTTP ${mcpUrlRes.status})${detail ? `: ${detail}` : ""}`,
+    );
+  }
+  const mcpUrlData = (await mcpUrlRes.json()) as UnknownRecord;
+  const userIdsUrl = Array.isArray(mcpUrlData.user_ids_url)
+    ? mcpUrlData.user_ids_url.filter(
+      (item): item is string => typeof item === "string" && item.trim().length > 0,
+    )
+    : [];
+  const mcpUrl = userIdsUrl[0] ?? pickString(mcpUrlData.mcp_url) ?? "";
+
+  upsertComposioProfile({
+    id: `${normalizeComposioToolkitSlug(toolkit)}-${Date.now()}`,
+    name: toolkitName,
+    toolkit_slug: normalizeComposioToolkitSlug(toolkit),
+    toolkit_name: toolkitName,
+    mcp_url: mcpUrl,
+    redirect_url: redirectUrl,
+    connected_account_id: connectedAccountId,
+    is_connected: false,
+    created_at: new Date().toISOString(),
+  });
+
+  return {
+    redirect_url: redirectUrl,
+    connection_id: connectedAccountId,
+  };
 }
 
 export async function disconnectComposioApp(
-  gatewayUrl: string,
-  apiKey: string,
+  _gatewayUrl: string,
+  _apiKey: string,
   connectionId: string,
 ): Promise<{ deleted: boolean }> {
-  const res = await gatewayFetch(
-    gatewayUrl,
-    apiKey,
-    `/v1/composio/connections/${encodeURIComponent(connectionId)}`,
-    { method: "DELETE" },
-  );
-  if (!res.ok) {
-    throw new Error(`Failed to disconnect (HTTP ${res.status})`);
-  }
-  return res.json() as Promise<{ deleted: boolean }>;
+  return {
+    deleted: deleteStoredComposioProfileByConnectionId(connectionId),
+  };
 }
 
 // ---------------------------------------------------------------------------

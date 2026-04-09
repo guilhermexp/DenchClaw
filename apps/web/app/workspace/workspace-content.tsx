@@ -35,6 +35,7 @@ import { SkillStorePanel } from "../components/skill-store/skill-store-panel";
 import { IntegrationsPanel } from "../components/integrations/integrations-panel";
 import { ChatComposioModalHost } from "../components/integrations/chat-composio-modal-host";
 import { CloudSettingsPanel } from "../components/settings/cloud-settings-panel";
+import { AiModelsPanel } from "../components/settings/ai-models-panel";
 import { CronJobDetail } from "../components/cron/cron-job-detail";
 import { CronSessionView } from "../components/cron/cron-session-view";
 import type { CronJob, CronJobsResponse } from "../types/cron";
@@ -179,6 +180,7 @@ type ContentState =
   | { kind: "skill-store" }
   | { kind: "integrations" }
   | { kind: "cloud" }
+  | { kind: "ai-models" }
   | { kind: "cron-job"; jobId: string; job: CronJob }
   | { kind: "cron-session"; jobId: string; job: CronJob; sessionId: string; run: import("../types/cron").CronRunLogEntry }
   | { kind: "duckdb-missing" }
@@ -1224,9 +1226,10 @@ function WorkspacePageInner() {
     [],
   );
 
-  const handleNavigate = useCallback((target: "cloud" | "integrations" | "skills" | "cron") => {
+  const handleNavigate = useCallback((target: "cloud" | "ai-models" | "integrations" | "skills" | "cron") => {
     const config = {
       cloud: { path: "~cloud", name: "Cloud", kind: "cloud" as const },
+      "ai-models": { path: "~ai-models", name: "AI Models", kind: "ai-models" as const },
       integrations: { path: "~integrations", name: "Integrations", kind: "integrations" as const },
       skills: { path: "~skills", name: "Skills", kind: "skill-store" as const },
       cron: { path: "~cron", name: "Cron", kind: "cron-dashboard" as const },
@@ -1325,6 +1328,10 @@ function WorkspacePageInner() {
         handleNavigate("cloud");
         return;
       }
+      if (node.path === "~ai-models") {
+        handleNavigate("ai-models");
+        return;
+      }
       // Workspace-mode folders are expanded/collapsed inline in the sidebar
       // tree — don't open them in the main content panel.
       if (node.type === "folder") {
@@ -1365,6 +1372,8 @@ function WorkspacePageInner() {
         setContent({ kind: "integrations" });
       } else if (tab.path === "~cloud") {
         setContent({ kind: "cloud" });
+      } else if (tab.path === "~ai-models") {
+        setContent({ kind: "ai-models" });
       } else if (tab.path.startsWith("~cron/")) {
         const jobId = tab.path.slice("~cron/".length);
         const job = cronJobs.find((j) => j.id === jobId);
@@ -1825,6 +1834,10 @@ function WorkspacePageInner() {
         openTabForNode({ path: "~cloud", name: "Cloud", type: "folder" });
         setActivePath("~cloud");
         setContent({ kind: "cloud" });
+      } else if (urlState.path === "~ai-models") {
+        openTabForNode({ path: "~ai-models", name: "AI Models", type: "folder" });
+        setActivePath("~ai-models");
+        setContent({ kind: "ai-models" });
       } else if (isAbsolutePath(urlState.path) || isHomeRelativePath(urlState.path)) {
         const name = urlState.path.split("/").pop() || urlState.path;
         const syntheticNode: TreeNode = { name, path: urlState.path, type: "file" };
@@ -1924,6 +1937,10 @@ function WorkspacePageInner() {
           openTabForNode({ path: "~cloud", name: "Cloud", type: "folder" });
           setActivePath("~cloud");
           setContent({ kind: "cloud" });
+        } else if (urlState.path === "~ai-models") {
+          openTabForNode({ path: "~ai-models", name: "AI Models", type: "folder" });
+          setActivePath("~ai-models");
+          setContent({ kind: "ai-models" });
         } else if (isAbsolutePath(urlState.path) || isHomeRelativePath(urlState.path)) {
           const name = urlState.path.split("/").pop() || urlState.path;
           const synNode: TreeNode = { name, path: urlState.path, type: "file" };
@@ -3626,6 +3643,13 @@ function ContentRenderer({
             </div>
             <CloudSettingsPanel />
           </div>
+        </div>
+      );
+
+    case "ai-models":
+      return (
+        <div className="h-full overflow-y-auto">
+          <AiModelsPanel />
         </div>
       );
 

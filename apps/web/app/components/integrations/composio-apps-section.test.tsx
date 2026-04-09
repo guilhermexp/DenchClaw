@@ -377,10 +377,80 @@ describe("ComposioAppsSection", () => {
     expect(normalized.categories).toEqual([]);
   });
 
-  it("shows lock badge when not eligible", () => {
-    render(<ComposioAppsSection eligible={false} lockBadge="Get Dench Cloud API Key" />);
+  it("allows saving a dedicated Composio API key when not eligible", async () => {
+    const user = userEvent.setup();
+    const onApiKeySaved = vi.fn();
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url === "/api/integrations" && init?.method === "POST") {
+        expect(JSON.parse(String(init.body))).toEqual({ composioApiKey: "composio-key" });
+        return new Response(JSON.stringify({
+          composio: {
+            hasApiKey: true,
+            hasDedicatedApiKey: true,
+            apiKeySource: "composio_config",
+          },
+        }));
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
 
-    expect(screen.getByText("Available with Dench Cloud")).toBeInTheDocument();
-    expect(screen.getByText("Get Dench Cloud API Key")).toBeInTheDocument();
+    render(
+      <ComposioAppsSection
+        eligible={false}
+        lockBadge="Add Composio API Key"
+        onApiKeySaved={onApiKeySaved}
+      />,
+    );
+
+    await user.type(screen.getByLabelText("Composio API key"), "composio-key");
+    await user.click(screen.getByRole("button", { name: "Save API key" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Composio API key saved.")).toBeInTheDocument();
+    });
+    expect(onApiKeySaved).toHaveBeenCalledTimes(1);
+    expect(screen.getByDisplayValue("")).toBeInTheDocument();
+  });
+
+  it("falls back to the API key update prompt when the saved key is rejected by the gateway", async () => {
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+
+      if (url === "/api/composio/connections?include_toolkits=1") {
+        return new Response(
+          JSON.stringify({
+            error: "Composio API key rejected by gateway. Update it and try again.",
+            code: "invalid_api_key",
+          }),
+          { status: 401 },
+        );
+      }
+
+      if (url.startsWith("/api/composio/toolkits")) {
+        return new Response(
+          JSON.stringify({
+            error: "Composio API key rejected by gateway. Update it and try again.",
+            code: "invalid_api_key",
+          }),
+          { status: 401 },
+        );
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    render(<ComposioAppsSection eligible hasDedicatedApiKey lockBadge={null} />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Your saved Composio API key was rejected. Update it to reconnect apps."),
+      ).toBeInTheDocument();
+    });
+
+    expect(screen.getByLabelText("Composio API key")).toBeInTheDocument();
+    expect(
+      screen.getByText("Composio API key rejected by gateway. Update it and try again."),
+    ).toBeInTheDocument();
   });
 });

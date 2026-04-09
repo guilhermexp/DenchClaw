@@ -23,6 +23,10 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_OPENCLAW_VERSION: openclawVersion,
   },
 
+  experimental: {
+    devtoolSegmentExplorer: false,
+  },
+
   async headers() {
     return [
       {

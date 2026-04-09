@@ -749,18 +749,39 @@ function preservePreviousStaticAssets(
   }
 }
 
+function ensureStandaloneBuildForSourceCheckout(packageRoot: string): void {
+  const sourceCheckoutWebPackage = path.join(packageRoot, "apps", "web", "package.json");
+  const standaloneServer = resolvePackagedStandaloneServerPath(packageRoot);
+  if (!existsSync(sourceCheckoutWebPackage) || existsSync(standaloneServer)) {
+    return;
+  }
+  try {
+    execFileSync(resolveCommandForPlatform("pnpm"), ["--dir", "apps/web", "build"], {
+      cwd: packageRoot,
+      env: process.env,
+      stdio: "pipe",
+    });
+  } catch {
+    // Leave the standalone missing so the caller reports the original error.
+  }
+}
+
 export function installManagedWebRuntime(params: {
   stateDir: string;
   packageRoot: string;
   denchVersion: string;
   webPort?: number;
   gatewayPort?: number;
+  ensureStandaloneBuild?: (packageRoot: string) => void;
 }): InstallManagedWebRuntimeResult {
   const runtimeDir = resolveManagedWebRuntimeDir(params.stateDir);
   const runtimeAppDir = resolveManagedWebRuntimeAppDir(params.stateDir);
   const runtimeServerPath = resolveManagedWebRuntimeServerPath(params.stateDir);
   const sourceStandaloneServer = resolvePackagedStandaloneServerPath(params.packageRoot);
   const sourceAppDir = resolvePackagedStandaloneAppDir(params.packageRoot);
+  if (!existsSync(sourceStandaloneServer)) {
+    (params.ensureStandaloneBuild ?? ensureStandaloneBuildForSourceCheckout)(params.packageRoot);
+  }
   if (!existsSync(sourceStandaloneServer)) {
     return {
       installed: false,

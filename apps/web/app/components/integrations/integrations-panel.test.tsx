@@ -11,6 +11,11 @@ const eligiblePayload = {
     isPrimaryProvider: true,
     primaryModel: "dench-cloud/anthropic.claude-opus-4-6-v1",
   },
+  composio: {
+    hasApiKey: true,
+    hasDedicatedApiKey: true,
+    apiKeySource: "composio_config",
+  },
   metadata: { schemaVersion: 1 },
   search: { builtIn: { enabled: false, denied: true, provider: "duckduckgo" }, effectiveOwner: "exa" },
   integrations: [],
@@ -88,13 +93,18 @@ describe("IntegrationsPanel", () => {
     });
   });
 
-  it("shows Dench Cloud lock badge when not eligible", async () => {
+  it("shows key-required lock badge when no Dench key is configured", async () => {
     const lockedPayload = {
       ...eligiblePayload,
       denchCloud: {
         hasKey: false,
         isPrimaryProvider: false,
         primaryModel: "anthropic/claude-4",
+      },
+      composio: {
+        hasApiKey: false,
+        hasDedicatedApiKey: false,
+        apiKeySource: "missing",
       },
     };
 
@@ -107,9 +117,10 @@ describe("IntegrationsPanel", () => {
     render(<IntegrationsPanel />);
 
     await waitFor(() => {
-      expect(screen.getByText("Available with Dench Cloud")).toBeInTheDocument();
+      expect(screen.getByText("Add your Composio API key to connect apps from this workspace.")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Get Dench Cloud API Key")).toBeInTheDocument();
+    expect(screen.getByText("Add Composio API Key")).toBeInTheDocument();
+    expect(screen.getByLabelText("Composio API key")).toBeInTheDocument();
   });
 });
