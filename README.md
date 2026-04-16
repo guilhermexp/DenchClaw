@@ -127,16 +127,16 @@ git clone https://github.com/DenchHQ/DenchClaw.git
 cd denchclaw
 
 pnpm install
-pnpm build
-
-pnpm dev
+pnpm dev        # next dev with HMR (source files, hot reload, fast iteration)
 ```
 
-Web UI development:
+Open `http://localhost:3010`. Edits under `apps/web/` hot-reload automatically.
+
+To simulate what end-users get from `npx denchclaw` (builds the CLI + Next
+standalone bundle and runs it from `~/.denchclaw/web-runtime/`):
 
 ```bash
-pnpm install
-pnpm web:dev
+pnpm dev:prod
 ```
 
 ---
