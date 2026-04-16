@@ -73,6 +73,7 @@ export function MeetingsPage({ embedded = false }: { embedded?: boolean } = {}) 
   const [meetings, setMeetings] = useState<MeetingItem[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
 
   const refreshMeetings = useCallback(async () => {
     const response = await fetch("/api/meetings/list", { cache: "no-store" });
@@ -82,6 +83,23 @@ export function MeetingsPage({ embedded = false }: { embedded?: boolean } = {}) 
     const payload = await response.json();
     setMeetings(Array.isArray(payload.meetings) ? payload.meetings : []);
   }, []);
+
+  const retryMeeting = useCallback(async (meetingId: string) => {
+    setRetryingId(meetingId);
+    setErrorMessage(null);
+    try {
+      const response = await fetch(`/api/meetings/${meetingId}/retry-transcription`, { method: "POST" });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(typeof payload.error === "string" ? payload.error : "Failed to retry transcription.");
+      }
+      await refreshMeetings();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to retry transcription.");
+    } finally {
+      setRetryingId(null);
+    }
+  }, [refreshMeetings]);
 
   useEffect(() => {
     void refreshMeetings();
@@ -386,6 +404,26 @@ export function MeetingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                   >
                     Meeting note com áudio, transcript bruto e versão embelezada vinculados como objects.
                   </div>
+
+                  {meeting.status === "error" ? (
+                    <button
+                      type="button"
+                      disabled={retryingId === meeting.meetingId}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        void retryMeeting(meeting.meetingId);
+                      }}
+                      className="self-start rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60"
+                      style={{
+                        background: "var(--color-surface-subtle, rgba(148,163,184,0.1))",
+                        border: "1px solid var(--color-border)",
+                        color: "var(--color-text)",
+                      }}
+                    >
+                      {retryingId === meeting.meetingId ? "Transcribing…" : "Tentar transcricao novamente"}
+                    </button>
+                  ) : null}
                 </a>
               );
             })}

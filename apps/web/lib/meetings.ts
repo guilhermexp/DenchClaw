@@ -668,6 +668,7 @@ async function transcribeWithDeepgram(file: File, startedAt: string): Promise<{
   const model = runtimeConfig.deepgramModel || "nova-3";
   const url = new URL("https://api.deepgram.com/v1/listen");
   url.searchParams.set("model", model);
+  url.searchParams.set("language", "multi");
   url.searchParams.set("punctuate", "true");
   url.searchParams.set("smart_format", "true");
   url.searchParams.set("diarize", "true");
@@ -701,7 +702,12 @@ async function transcribeWithDeepgram(file: File, startedAt: string): Promise<{
   const firstAlternative = alternatives[0];
   const rawText = typeof firstAlternative?.transcript === "string" ? firstAlternative.transcript.trim() : "";
   if (!rawText) {
-    throw new Error("Deepgram returned an empty transcript.");
+    const metadata = payload?.metadata as Record<string, unknown> | undefined;
+    const audioDuration = typeof metadata?.duration === "number" ? metadata.duration : null;
+    const hint = audioDuration != null && audioDuration < 1
+      ? " (audio duration < 1s — try recording for longer)"
+      : " (no speech detected — check mic input and language)";
+    throw new Error(`Deepgram returned an empty transcript${hint}.`);
   }
 
   const language = typeof firstAlternative?.detected_language === "string"
@@ -875,10 +881,37 @@ export async function finalizeMeetingUpload(input: {
     }),
   );
 
+  return runTranscriptionPipeline({
+    dbFile,
+    meetingId,
+    audioAssetId,
+    audioFile: input.file,
+    sessionId,
+    startedAt,
+    durationSeconds,
+    source: input.source,
+    audioFilePath: persistedAudio.filePath,
+    filenameForDoc: input.source === "import" ? persistedAudio.filename : null,
+  });
+}
+
+async function runTranscriptionPipeline(args: {
+  dbFile: string;
+  meetingId: string;
+  audioAssetId: string;
+  audioFile: File;
+  sessionId: string;
+  startedAt: string;
+  durationSeconds: number;
+  source: MeetingSource;
+  audioFilePath: string;
+  filenameForDoc: string | null;
+}): Promise<FinalizeMeetingUploadResult> {
+  const { dbFile, meetingId, audioAssetId, audioFile, sessionId, startedAt, durationSeconds, source, audioFilePath, filenameForDoc } = args;
   let transcriptAssetId: string | null = null;
 
   try {
-    const transcript = await transcribeWithDeepgram(input.file, startedAt);
+    const transcript = await transcribeWithDeepgram(audioFile, startedAt);
     updateEntryFields(dbFile, MEETING_OBJECT, meetingId, {
       [FIELD.status]: "beautifying",
       [FIELD.rawTranscriptFallback]: transcript.rawText,
@@ -903,7 +936,7 @@ export async function finalizeMeetingUpload(input: {
     transcriptAssetId = insertEntry(dbFile, TRANSCRIPT_OBJECT, {
       [FIELD.title]: `${fallbackMeetingTitle()} Transcript`,
       [FIELD.sessionId]: sessionId,
-      [FIELD.source]: input.source,
+      [FIELD.source]: source,
       [FIELD.language]: transcript.language,
       [FIELD.provider]: transcript.provider,
       [FIELD.model]: transcript.model,
@@ -922,14 +955,14 @@ export async function finalizeMeetingUpload(input: {
       MEETING_OBJECT,
       meetingId,
       buildMeetingDocumentContent({
-        audioFilePath: persistedAudio.filePath,
+        audioFilePath,
         beautifiedMarkdown: beautified,
         rawTranscript: transcript.rawText,
         startedAt,
         durationSeconds,
         language: transcript.language,
-        source: input.source,
-        filename: input.source === "import" ? persistedAudio.filename : null,
+        source,
+        filename: filenameForDoc,
       }),
     );
 
@@ -967,14 +1000,14 @@ export async function finalizeMeetingUpload(input: {
       MEETING_OBJECT,
       meetingId,
       buildMeetingErrorDocumentContent({
-        audioFilePath: persistedAudio.filePath,
+        audioFilePath,
         errorMessage: message,
         rawTranscript: fallbackTranscript,
         startedAt,
         durationSeconds,
         language: null,
-        source: input.source,
-        filename: input.source === "import" ? persistedAudio.filename : null,
+        source,
+        filename: filenameForDoc,
       }),
     );
 
@@ -993,6 +1026,70 @@ export async function finalizeMeetingUpload(input: {
       status: "error",
     };
   }
+}
+
+export async function retryMeetingTranscription(meetingId: string): Promise<FinalizeMeetingUploadResult> {
+  ensureMeetingSchema();
+  const dbFile = requireDbPath();
+
+  const meeting = readEntryById(dbFile, MEETING_OBJECT, meetingId);
+  if (!meeting) {
+    throw new Error(`Meeting ${meetingId} not found.`);
+  }
+
+  const audioAssetId = fieldValue(meeting, FIELD.audioAssetId);
+  if (!audioAssetId) {
+    throw new Error("Meeting has no audio asset recorded.");
+  }
+  const audioAsset = readEntryById(dbFile, AUDIO_OBJECT, audioAssetId);
+  if (!audioAsset) {
+    throw new Error("Audio asset row missing from database.");
+  }
+
+  const audioRelPath = fieldValue(audioAsset, FIELD.filePath) ?? fieldValue(meeting, FIELD.audioFilePath);
+  if (!audioRelPath) {
+    throw new Error("Audio file path not recorded for this meeting.");
+  }
+  const workspaceRoot = requireWorkspaceRoot();
+  const absoluteAudioPath = join(workspaceRoot, audioRelPath);
+  let audioBuffer: Buffer;
+  try {
+    audioBuffer = readFileSync(absoluteAudioPath);
+  } catch {
+    throw new Error(`Audio file not found on disk: ${audioRelPath}`);
+  }
+
+  const sessionId = fieldValue(meeting, FIELD.sessionId) ?? createMeetingSessionId();
+  const startedAt = fieldValue(meeting, FIELD.startedAt) ?? new Date().toISOString();
+  const durationSeconds = Number(fieldValue(meeting, FIELD.durationSeconds) ?? "0") || 0;
+  const sourceValue = fieldValue(meeting, FIELD.source);
+  const source: MeetingSource = sourceValue === "record" ? "record" : "import";
+  const originalFilename = fieldValue(audioAsset, FIELD.originalFilename) ?? fieldValue(meeting, FIELD.filename);
+  const mimeType = fieldValue(audioAsset, FIELD.mimeType) ?? "audio/webm";
+
+  const audioFile = new File(
+    [new Uint8Array(audioBuffer)],
+    originalFilename ?? `${sessionId}.webm`,
+    { type: mimeType },
+  );
+
+  updateEntryFields(dbFile, MEETING_OBJECT, meetingId, {
+    [FIELD.status]: "transcribing",
+    [FIELD.errorMessage]: null,
+  });
+
+  return runTranscriptionPipeline({
+    dbFile,
+    meetingId,
+    audioAssetId,
+    audioFile,
+    sessionId,
+    startedAt,
+    durationSeconds,
+    source,
+    audioFilePath: audioRelPath,
+    filenameForDoc: source === "import" ? originalFilename : null,
+  });
 }
 
 export async function listMeetings(): Promise<MeetingListItem[]> {
