@@ -3,7 +3,6 @@ import React from "react";
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, act, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import htmlToDocx from "html-to-docx";
 
 import {
 	RichDocumentEditor,
@@ -75,10 +74,6 @@ vi.mock("@tiptap/react/menus", () => ({
 	BubbleMenu: ({ children }: { children: React.ReactNode }) => (
 		<div data-testid="bubble-menu">{children}</div>
 	),
-}));
-
-vi.mock("html-to-docx", () => ({
-	default: vi.fn(async () => new Blob([new Uint8Array([1, 2, 3])], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" })),
 }));
 
 function createMockChain(): MockChain {
@@ -319,7 +314,7 @@ describe("RichDocumentEditor save flows", () => {
 		});
 	});
 
-	it("saves DOCX via html-to-docx and /api/workspace/write-binary", async () => {
+	it("saves DOCX via /api/workspace/convert-docx", async () => {
 		const fetchMock = vi.fn().mockResolvedValue(
 			new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } }),
 		);
@@ -332,23 +327,14 @@ describe("RichDocumentEditor save flows", () => {
 		markDirty();
 		await user.click(screen.getByRole("button", { name: "Save" }));
 
-		expect(vi.mocked(htmlToDocx)).toHaveBeenCalledWith(
-			"<p>Updated DOCX body</p>",
-			undefined,
-			expect.objectContaining({
-				table: { row: { cantSplit: true } },
-				footer: true,
-				pageNumber: true,
+		expect(fetchMock).toHaveBeenCalledWith("/api/workspace/convert-docx", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				path: "docs/spec.docx",
+				html: "<p>Updated DOCX body</p>",
 			}),
-		);
-
-		const reqInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
-		expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/workspace/write-binary");
-		expect(reqInit.method).toBe("POST");
-		expect(reqInit.body).toBeInstanceOf(FormData);
-		const form = reqInit.body as FormData;
-		expect(form.get("path")).toBe("docs/spec.docx");
-		expect(form.get("file")).toBeInstanceOf(Blob);
+		});
 	});
 
 	it("handles HTTP failure responses by surfacing Save failed", async () => {

@@ -4,6 +4,7 @@ import { ThemeProvider } from "next-themes";
 import { getOrCreateAnonymousId, readPersonInfo, readPrivacyMode } from "@/lib/telemetry";
 import { PostHogProvider } from "./components/posthog-provider";
 import "./globals.css";
+import "@openuidev/react-ui/components.css";
 
 export const metadata: Metadata = {
   title: "DenchClaw",

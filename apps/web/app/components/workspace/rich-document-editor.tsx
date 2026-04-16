@@ -207,19 +207,13 @@ export function RichDocumentEditor({
         if (!res.ok) {throw new Error("Save failed");}
       } else {
         const html = editor.getHTML();
-        const { default: htmlToDocx } = await import("html-to-docx");
-        const docxBlob = await htmlToDocx(html, undefined, {
-          table: { row: { cantSplit: true } },
-          footer: true,
-          pageNumber: true,
-        });
-
-        const formData = new FormData();
-        formData.append("file", docxBlob);
-        formData.append("path", filePath);
-        const res = await fetch("/api/workspace/write-binary", {
+        const res = await fetch("/api/workspace/convert-docx", {
           method: "POST",
-          body: formData,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            path: filePath,
+            html,
+          }),
         });
         if (!res.ok) {throw new Error("Save failed");}
       }

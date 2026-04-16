@@ -4,12 +4,13 @@ import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { WorkspaceSidebar } from "@/app/components/workspace/workspace-sidebar";
 import { AiModelsPanel, type AiModelsPageState } from "@/app/components/settings/ai-models-panel";
+import { MeetingsAiSettingsPanel } from "@/app/components/settings/meetings-ai-settings-panel";
 
 export function AiModelsShell({ initialState }: { initialState: AiModelsPageState }) {
   const router = useRouter();
 
-  const handleNavigate = useCallback((target: "cloud" | "ai-models" | "integrations" | "skills" | "cron") => {
-    if (target === "ai-models") {
+  const handleNavigate = useCallback((target: "cloud" | "meetings" | "ai-models" | "integrations" | "skills" | "cron") => {
+    if (target === "ai-models" || target === "meetings") {
       router.push("/settings/hermes");
       return;
     }
@@ -46,8 +47,9 @@ export function AiModelsShell({ initialState }: { initialState: AiModelsPageStat
       </div>
 
       <main className="min-w-0 flex-1 overflow-auto" style={{ background: "var(--color-surface)" }}>
-        <div className="mx-auto max-w-5xl p-6 md:p-8">
+        <div className="mx-auto max-w-5xl p-6 md:p-8 space-y-6">
           <AiModelsPanel initialState={initialState} />
+          <MeetingsAiSettingsPanel />
         </div>
       </main>
     </div>

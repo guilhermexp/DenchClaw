@@ -36,6 +36,8 @@ import { IntegrationsPanel } from "../components/integrations/integrations-panel
 import { ChatComposioModalHost } from "../components/integrations/chat-composio-modal-host";
 import { CloudSettingsPanel } from "../components/settings/cloud-settings-panel";
 import { AiModelsPanel } from "../components/settings/ai-models-panel";
+import { MeetingsAiSettingsPanel } from "../components/settings/meetings-ai-settings-panel";
+import { MeetingsPage } from "../meetings/meetings-page";
 import { CronJobDetail } from "../components/cron/cron-job-detail";
 import { CronSessionView } from "../components/cron/cron-session-view";
 import type { CronJob, CronJobsResponse } from "../types/cron";
@@ -180,6 +182,7 @@ type ContentState =
   | { kind: "skill-store" }
   | { kind: "integrations" }
   | { kind: "cloud" }
+  | { kind: "meetings" }
   | { kind: "ai-models" }
   | { kind: "cron-job"; jobId: string; job: CronJob }
   | { kind: "cron-session"; jobId: string; job: CronJob; sessionId: string; run: import("../types/cron").CronRunLogEntry }
@@ -1226,9 +1229,10 @@ function WorkspacePageInner() {
     [],
   );
 
-  const handleNavigate = useCallback((target: "cloud" | "ai-models" | "integrations" | "skills" | "cron") => {
+  const handleNavigate = useCallback((target: "cloud" | "meetings" | "ai-models" | "integrations" | "skills" | "cron") => {
     const config = {
       cloud: { path: "~cloud", name: "Cloud", kind: "cloud" as const },
+      meetings: { path: "~meetings", name: "Meetings", kind: "meetings" as const },
       "ai-models": { path: "~hermes", name: "Hermes", kind: "ai-models" as const },
       integrations: { path: "~integrations", name: "Integrations", kind: "integrations" as const },
       skills: { path: "~skills", name: "Skills", kind: "skill-store" as const },
@@ -1328,6 +1332,10 @@ function WorkspacePageInner() {
         handleNavigate("cloud");
         return;
       }
+      if (node.path === "~meetings") {
+        handleNavigate("meetings");
+        return;
+      }
       if (node.path === "~hermes" || node.path === "~ai-models") {
         handleNavigate("ai-models");
         return;
@@ -1372,6 +1380,8 @@ function WorkspacePageInner() {
         setContent({ kind: "integrations" });
       } else if (tab.path === "~cloud") {
         setContent({ kind: "cloud" });
+      } else if (tab.path === "~meetings") {
+        setContent({ kind: "meetings" });
       } else if (tab.path === "~hermes" || tab.path === "~ai-models") {
         setContent({ kind: "ai-models" });
       } else if (tab.path.startsWith("~cron/")) {
@@ -1834,6 +1844,10 @@ function WorkspacePageInner() {
         openTabForNode({ path: "~cloud", name: "Cloud", type: "folder" });
         setActivePath("~cloud");
         setContent({ kind: "cloud" });
+      } else if (urlState.path === "~meetings") {
+        openTabForNode({ path: "~meetings", name: "Meetings", type: "folder" });
+        setActivePath("~meetings");
+        setContent({ kind: "meetings" });
       } else if (urlState.path === "~hermes" || urlState.path === "~ai-models") {
         openTabForNode({ path: "~hermes", name: "Hermes", type: "folder" });
         setActivePath("~hermes");
@@ -1937,6 +1951,10 @@ function WorkspacePageInner() {
           openTabForNode({ path: "~cloud", name: "Cloud", type: "folder" });
           setActivePath("~cloud");
           setContent({ kind: "cloud" });
+        } else if (urlState.path === "~meetings") {
+          openTabForNode({ path: "~meetings", name: "Meetings", type: "folder" });
+          setActivePath("~meetings");
+          setContent({ kind: "meetings" });
         } else if (urlState.path === "~hermes" || urlState.path === "~ai-models") {
           openTabForNode({ path: "~hermes", name: "Hermes", type: "folder" });
           setActivePath("~hermes");
@@ -3646,10 +3664,22 @@ function ContentRenderer({
         </div>
       );
 
+    case "meetings":
+      return (
+        <div className="h-full overflow-y-auto">
+          <div className="mx-auto max-w-5xl p-6">
+            <MeetingsPage embedded />
+          </div>
+        </div>
+      );
+
     case "ai-models":
       return (
         <div className="h-full overflow-y-auto">
-          <AiModelsPanel />
+          <div className="mx-auto max-w-5xl p-6 space-y-6">
+            <AiModelsPanel />
+            <MeetingsAiSettingsPanel />
+          </div>
         </div>
       );
 

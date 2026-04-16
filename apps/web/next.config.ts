@@ -54,10 +54,22 @@ const nextConfig: NextConfig = {
 
   webpack: (config, { dev, isServer }) => {
     if (!isServer) {
-      // html-to-docx references Node-only modules that should not be resolved in browser bundles.
+      // html-to-docx references many Node-only modules. The editor only loads
+      // that package on explicit DOCX save, so browser bundles should never try
+      // to polyfill these builtins during normal app startup.
       config.resolve.fallback = {
         ...config.resolve.fallback,
         fs: false,
+        path: false,
+        util: false,
+        events: false,
+        stream: false,
+        http: false,
+        https: false,
+        url: false,
+        punycode: false,
+        crypto: false,
+        zlib: false,
         encoding: false,
       };
     }

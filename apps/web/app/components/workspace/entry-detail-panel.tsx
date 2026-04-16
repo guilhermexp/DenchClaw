@@ -13,6 +13,14 @@ import { useToast } from "./toast";
 import { UrlFavicon } from "./url-favicon";
 import { LinkOpenButton } from "./link-open-button";
 import { LinkPreviewWrapper } from "./workspace-link";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog";
+import { rawFileReadUrl } from "@/lib/workspace-paths";
 
 function safeString(val: unknown): string {
   if (val == null) return "";
@@ -423,6 +431,60 @@ function PropertySkeleton() {
   );
 }
 
+function isTruthyMeetingField(value: unknown): boolean {
+  return value === true || value === "true" || value === "1";
+}
+
+function MeetingTranscriptDialog({
+  open,
+  onOpenChange,
+  transcriptText,
+  language,
+  provider,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  transcriptText: string;
+  language: string | null;
+  provider: string | null;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl p-0 overflow-hidden">
+        <DialogHeader className="px-5 pt-5">
+          <DialogTitle>Raw Transcript</DialogTitle>
+          <DialogDescription>
+            {provider ? `Provider: ${provider}` : "Transcript bruto"}{language ? ` • ${language}` : ""}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="px-5 pb-5">
+          <div className="flex justify-end mb-2">
+            <button
+              type="button"
+              onClick={() => void navigator.clipboard.writeText(transcriptText)}
+              className="px-2.5 py-1 rounded-md text-xs font-medium"
+              style={{ background: "var(--color-accent)", color: "white" }}
+            >
+              Copy
+            </button>
+          </div>
+          <pre
+            className="max-h-[60vh] overflow-auto rounded-2xl p-4 text-xs whitespace-pre-wrap"
+            style={{
+              background: "var(--color-surface)",
+              color: "var(--color-text)",
+              border: "1px solid var(--color-border)",
+            }}
+          >
+            {transcriptText}
+          </pre>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Main Panel ──
 
 export function EntryDetailPanel({
@@ -442,6 +504,12 @@ export function EntryDetailPanel({
   const [mdContent, setMdContent] = useState("");
   const [mdFilePath, setMdFilePath] = useState(`${objectName}/${entryId}.md`);
   const [mdLoading, setMdLoading] = useState(true);
+  const [showRawTranscript, setShowRawTranscript] = useState(false);
+  const [rawTranscriptLoading, setRawTranscriptLoading] = useState(false);
+  const [rawTranscriptText, setRawTranscriptText] = useState("");
+  const [rawTranscriptError, setRawTranscriptError] = useState<string | null>(null);
+  const [rawTranscriptLanguage, setRawTranscriptLanguage] = useState<string | null>(null);
+  const [rawTranscriptProvider, setRawTranscriptProvider] = useState<string | null>(null);
 
   // Fetch entry data
   useEffect(() => {
@@ -558,11 +626,40 @@ export function EntryDetailPanel({
   const title = displayField && data?.entry[displayField] ? safeString(data.entry[displayField]) : `${String(objectName)} entry`;
   const createdAtValue = data ? resolveEntryMetaValue(data.entry, CREATED_AT_KEYS) : undefined;
   const updatedAtValue = data ? resolveEntryMetaValue(data.entry, UPDATED_AT_KEYS) : undefined;
+  const isMeetingEntry = objectName === "meetings";
+  const meetingAudioPath = data ? safeString(data.entry["Audio File Path"]) : "";
+  const meetingHasTranscript = data ? isTruthyMeetingField(data.entry["Has Transcript"]) || !!safeString(data.entry["Raw Transcript Fallback"]) : false;
 
   const [propsCollapsed, setPropsCollapsed] = useState(false);
 
   const dataFieldsList = useMemo(() => data?.fields.filter((f) => f.type !== "action") ?? [], [data?.fields]);
   const actionFieldsList = useMemo(() => data?.fields.filter((f) => f.type === "action") ?? [], [data?.fields]);
+
+  const handleOpenRawTranscript = useCallback(async () => {
+    if (!isMeetingEntry) return;
+    setShowRawTranscript(true);
+    setRawTranscriptLoading(true);
+    setRawTranscriptError(null);
+
+    try {
+      const response = await fetch(`/api/meetings/${encodeURIComponent(entryId)}/raw-transcript`);
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({ error: "Failed to load transcript" }));
+        setRawTranscriptError(payload.error ?? "Failed to load transcript");
+        setRawTranscriptText("");
+        return;
+      }
+      const payload = await response.json();
+      setRawTranscriptText(payload.transcriptText ?? "");
+      setRawTranscriptLanguage(payload.language ?? null);
+      setRawTranscriptProvider(payload.provider ?? null);
+    } catch {
+      setRawTranscriptError("Network error");
+      setRawTranscriptText("");
+    } finally {
+      setRawTranscriptLoading(false);
+    }
+  }, [entryId, isMeetingEntry]);
 
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden" style={{ background: "var(--color-bg)" }}>
@@ -584,6 +681,17 @@ export function EntryDetailPanel({
           </h2>
         </div>
         <div className="flex items-center gap-0.5 flex-shrink-0">
+          {isMeetingEntry && meetingHasTranscript && (
+            <button
+              type="button"
+              onClick={() => void handleOpenRawTranscript()}
+              className="px-2 py-1 rounded-md text-[11px] font-medium flex-shrink-0 hover:opacity-80"
+              style={{ color: "var(--color-accent)", border: "1px solid var(--color-border)" }}
+              title="Open raw transcript"
+            >
+              Raw Transcript
+            </button>
+          )}
           <button type="button" onClick={() => void handleDelete()} disabled={deleting}
             className="p-1 rounded-md flex-shrink-0 hover:opacity-80" style={{ color: "var(--color-error)" }} title="Delete entry"
           >
@@ -769,6 +877,40 @@ export function EntryDetailPanel({
         {/* Editor section — occupies remaining space */}
         {!loading && !error && (
           <div className="entry-detail-editor">
+            {isMeetingEntry && meetingAudioPath && (
+              <div className="px-5 pt-4">
+                <div
+                  className="rounded-2xl p-4"
+                  style={{
+                    background: "var(--color-surface)",
+                    border: "1px solid var(--color-border)",
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <div>
+                      <div className="text-xs uppercase tracking-wider font-medium" style={{ color: "var(--color-text-muted)" }}>
+                        Meeting Audio
+                      </div>
+                      <div className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
+                        {title}
+                      </div>
+                    </div>
+                    <a
+                      href={rawFileReadUrl(meetingAudioPath)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs px-2 py-1 rounded-md"
+                      style={{ color: "var(--color-accent)", border: "1px solid var(--color-border)" }}
+                    >
+                      Open
+                    </a>
+                  </div>
+                  <audio controls className="w-full" src={rawFileReadUrl(meetingAudioPath)}>
+                    <track kind="captions" />
+                  </audio>
+                </div>
+              </div>
+            )}
             {mdLoading ? (
               <div className="px-5 py-6">
                 <div className="space-y-2">
@@ -789,6 +931,22 @@ export function EntryDetailPanel({
           </div>
         )}
       </div>
+
+      {isMeetingEntry && (
+        <MeetingTranscriptDialog
+          open={showRawTranscript}
+          onOpenChange={setShowRawTranscript}
+          transcriptText={
+            rawTranscriptLoading
+              ? "Loading transcript..."
+              : rawTranscriptError
+                ? rawTranscriptError
+                : rawTranscriptText || "Transcript not available."
+          }
+          language={rawTranscriptLanguage}
+          provider={rawTranscriptProvider}
+        />
+      )}
 
       {confirmState && (
         <ConfirmDialog

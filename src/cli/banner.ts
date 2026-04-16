@@ -20,6 +20,10 @@ const hasJsonFlag = (argv: string[]) =>
 const hasVersionFlag = (argv: string[]) =>
   argv.some((arg) => arg === "--version" || arg === "-V") || hasRootVersionAlias(argv);
 
+const NON_ASCII_WIDE_CELL = 2;
+const ASCII_CELL = 1;
+const ART_WIDTH_SAFETY_MARGIN = 2;
+
 // ---------------------------------------------------------------------------
 // DENCHCLAW ASCII art (figlet "ANSI Shadow" font, baked at build time)
 // ---------------------------------------------------------------------------
@@ -31,6 +35,19 @@ const DENCHCLAW_ASCII = [
   "██████╔╝███████╗██║ ╚████║╚██████╗██║  ██║╚██████╗███████╗██║  ██║╚███╔███╔╝",
   "╚═════╝ ╚══════╝╚═╝  ╚═══╝ ╚═════╝╚═╝  ╚═╝ ╚═════╝╚══════╝╚═╝  ╚═╝ ╚══╝╚══╝ ",
 ];
+
+function estimateTerminalCells(input: string): number {
+  let width = 0;
+  for (const char of input) {
+    width += char.charCodeAt(0) > 0x7f ? NON_ASCII_WIDE_CELL : ASCII_CELL;
+  }
+  return width;
+}
+
+export function canRenderCliBannerArt(columns: number): boolean {
+  const widestLine = Math.max(...DENCHCLAW_ASCII.map((line) => estimateTerminalCells(line)));
+  return columns >= widestLine + ART_WIDTH_SAFETY_MARGIN;
+}
 
 // ---------------------------------------------------------------------------
 // Iron-metallic gradient colors (dark iron → bright silver → dark iron)
@@ -154,18 +171,20 @@ export async function emitCliBanner(version: string, options: BannerOptions = {}
 
   bannerEmitted = true;
   const rich = options.richTty ?? isRich();
+  const columns = options.columns ?? process.stdout.columns ?? 120;
+  const canRenderArt = canRenderCliBannerArt(columns);
 
   process.stdout.write("\n");
 
-  if (rich) {
+  if (rich && canRenderArt) {
     // Animated iron shimmer
     await animateIronBanner();
-  } else {
+  } else if (canRenderArt) {
     // Plain ASCII fallback
     process.stdout.write(DENCHCLAW_ASCII.join("\n") + "\n");
   }
 
-  const line = formatCliBannerLine(version, options);
+  const line = formatCliBannerLine(version, { ...options, columns });
   process.stdout.write(`${line}\n\n`);
 }
 

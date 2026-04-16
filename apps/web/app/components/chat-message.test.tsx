@@ -24,6 +24,21 @@ vi.mock("posthog-js/react/surveys", () => ({
   })),
 }));
 
+vi.mock("./openui-assistant-renderer", () => ({
+  OpenUiAssistantRenderer: ({
+    code,
+    contextString,
+  }: {
+    code: string;
+    contextString?: string | null;
+  }) => (
+    <div>
+      <div data-testid="openui-renderer">{code}</div>
+      {contextString ? <div data-testid="openui-context">{contextString}</div> : null}
+    </div>
+  ),
+}));
+
 beforeEach(() => {
   global.fetch = vi.fn(async (input: RequestInfo | URL) => {
     const url = typeof input === "string" ? input : input.toString();
@@ -190,5 +205,41 @@ describe("ChatMessage", () => {
     });
 
     expect(button.querySelector('img[src="/integrations/stripe-logomark.svg"]')).toBeNull();
+  });
+
+  it("renders OpenUI assistant output with the dedicated renderer", () => {
+    render(
+      <ChatMessage
+        message={{
+          id: "assistant-openui",
+          role: "assistant",
+          parts: [{
+            type: "text",
+            text: 'root = Card([title])\ntitle = TextContent("Hello OpenUI")',
+          }],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId("openui-renderer")).toHaveTextContent(
+      'root = Card([title]) title = TextContent("Hello OpenUI")',
+    );
+  });
+
+  it("passes detached OpenUI context to the renderer", () => {
+    render(
+      <ChatMessage
+        message={{
+          id: "assistant-openui-context",
+          role: "assistant",
+          parts: [{
+            type: "text",
+            text: 'root = Card([title])\ntitle = TextContent("Hello")\n<context>{"foo":"bar"}</context>',
+          }],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId("openui-context")).toHaveTextContent('{"foo":"bar"}');
   });
 });

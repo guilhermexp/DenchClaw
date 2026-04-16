@@ -23,6 +23,8 @@ import {
 } from "@/lib/composio-chat-actions";
 import { Dialog, DialogContent } from "./ui/dialog";
 import { useComposioToolkitBrand } from "@/lib/composio-toolkit-brand";
+import { OpenUiAssistantRenderer } from "./openui-assistant-renderer";
+import { extractOpenUiPayload } from "./openui-message";
 
 // Lazy-load ReportCard (uses Recharts which is heavy)
 const ReportCard = dynamic(
@@ -1225,17 +1227,32 @@ export const ChatMessage = memo(function ChatMessage({ message, isStreaming, onS
 				className="chat-prose chat-message-font text-sm"
 				style={{ color: "var(--color-text)" }}
 			>
-				<ReactMarkdown
-					remarkPlugins={[remarkGfm]}
-					components={markdownComponents}
-					urlTransform={(url) =>
-						parseComposioChatAction(url)
-							? url
-							: defaultUrlTransform(url)
+				{(() => {
+					const openUiPayload = extractOpenUiPayload(segment.text);
+					if (openUiPayload) {
+						return (
+							<OpenUiAssistantRenderer
+								code={openUiPayload.code}
+								contextString={openUiPayload.contextString}
+								isStreaming={isStreaming}
+							/>
+						);
 					}
-				>
-					{segment.text}
-				</ReactMarkdown>
+
+					return (
+						<ReactMarkdown
+							remarkPlugins={[remarkGfm]}
+							components={markdownComponents}
+							urlTransform={(url) =>
+								parseComposioChatAction(url)
+									? url
+									: defaultUrlTransform(url)
+							}
+						>
+							{segment.text}
+						</ReactMarkdown>
+					);
+				})()}
 			</motion.div>
 				);
 				}
