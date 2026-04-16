@@ -151,6 +151,14 @@ function requireDbPath(): string {
   return dbFile;
 }
 
+function resolveOrCreateDbPath(): string {
+  const existing = duckdbPath();
+  if (existing) {
+    return existing;
+  }
+  return join(requireWorkspaceRoot(), "workspace.duckdb");
+}
+
 function boolString(value: boolean): string {
   return value ? "true" : "false";
 }
@@ -399,11 +407,18 @@ function ensureFieldEntries(dbFile: string, objectId: string, definition: Meetin
 
 export function ensureMeetingSchema(): void {
   const workspaceRoot = requireWorkspaceRoot();
-  const dbFile = requireDbPath();
+  const dbFile = resolveOrCreateDbPath();
 
   ensureMeetingDirectories(workspaceRoot);
   ensureMeetingObjectDirectories(workspaceRoot);
-  duckdbExecOnFile(dbFile, "ALTER TABLE objects ADD COLUMN IF NOT EXISTS display_field VARCHAR");
+  duckdbExecOnFile(
+    dbFile,
+    "CREATE TABLE IF NOT EXISTS objects (id VARCHAR PRIMARY KEY, name VARCHAR, icon VARCHAR, description VARCHAR, display_field VARCHAR);" +
+    "CREATE TABLE IF NOT EXISTS fields (id VARCHAR PRIMARY KEY, object_id VARCHAR, name VARCHAR, type VARCHAR);" +
+    "CREATE TABLE IF NOT EXISTS entries (id VARCHAR PRIMARY KEY, object_id VARCHAR, created_at VARCHAR, updated_at VARCHAR);" +
+    "CREATE TABLE IF NOT EXISTS entry_fields (entry_id VARCHAR, field_id VARCHAR, value VARCHAR);" +
+    "ALTER TABLE objects ADD COLUMN IF NOT EXISTS display_field VARCHAR;",
+  );
 
   for (const definition of getMeetingObjectDefinitions()) {
     const objectId = ensureObjectEntry(dbFile, definition);
@@ -981,6 +996,9 @@ export async function finalizeMeetingUpload(input: {
 }
 
 export async function listMeetings(): Promise<MeetingListItem[]> {
+  if (!duckdbPath()) {
+    return [];
+  }
   ensureMeetingSchema();
   const dbFile = requireDbPath();
   return readObjectEntries(dbFile, MEETING_OBJECT)
@@ -996,6 +1014,9 @@ export async function listMeetings(): Promise<MeetingListItem[]> {
 }
 
 export async function getMeetingRawTranscript(meetingId: string): Promise<RawTranscriptPayload | null> {
+  if (!duckdbPath()) {
+    return null;
+  }
   ensureMeetingSchema();
   const dbFile = requireDbPath();
   const meeting = readEntryById(dbFile, MEETING_OBJECT, meetingId);
