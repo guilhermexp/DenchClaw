@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { resolveOpenClawStateDir, resolveActiveAgentId } from "@/lib/workspace";
-import { getActiveRun } from "@/lib/active-runs";
+import { getActiveRun } from "@/lib/hermes-bridge";
 import { resolveSessionKey } from "@/app/api/web-sessions/shared";
 
 export const runtime = "nodejs";
@@ -42,7 +42,7 @@ export async function GET(req: Request) {
 
 	const run = getActiveRun(sessionId);
 	const fallbackAgentId = resolveActiveAgentId();
-	const webSessionKey = run?.pinnedSessionKey
+	const webSessionKey = run?.sessionKey
 		?? resolveSessionKey(sessionId, fallbackAgentId);
 	const entries = readSubagentRegistry();
 

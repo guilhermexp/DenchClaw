@@ -1,0 +1,60 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e4]:
+      - separator [ref=e5]
+      - complementary [ref=e6]:
+        - generic [ref=e7]:
+          - button "Workspace -" [ref=e10] [cursor=pointer]:
+            - generic [ref=e11]: Workspace
+            - generic [ref=e12]: "-"
+            - img [ref=e13]
+          - button "Hide sidebar (⌘B)" [ref=e15] [cursor=pointer]:
+            - img [ref=e16]
+        - generic [ref=e20]:
+          - generic:
+            - img
+          - textbox "Search files..." [ref=e21]
+        - generic [ref=e24]: ⠋
+        - generic [ref=e25]:
+          - button "Cloud" [ref=e26] [cursor=pointer]:
+            - img [ref=e28]
+            - text: Cloud
+          - button "Hermes" [ref=e30] [cursor=pointer]:
+            - img [ref=e32]
+            - text: Hermes
+          - button "Integrations" [ref=e36] [cursor=pointer]:
+            - img [ref=e38]
+            - text: Integrations
+          - button "Skills" [ref=e40] [cursor=pointer]:
+            - img [ref=e42]
+            - text: Skills
+          - button "Cron" [ref=e44] [cursor=pointer]:
+            - img [ref=e46]
+            - text: Cron
+        - generic [ref=e49]:
+          - link "dench.com (v2.5.3)" [ref=e50] [cursor=pointer]:
+            - /url: https://dench.com
+          - generic [ref=e51]:
+            - button "Show dotfiles" [ref=e52] [cursor=pointer]:
+              - img [ref=e53]
+            - button "Switch to dark mode" [ref=e58] [cursor=pointer]:
+              - img [ref=e59]
+    - main [ref=e61]:
+      - generic [ref=e62]:
+        - button "Chat history" [ref=e66] [cursor=pointer]:
+          - img [ref=e67]
+        - complementary [ref=e71]:
+          - generic [ref=e72]:
+            - separator [ref=e73]
+            - generic [ref=e74]:
+              - generic [ref=e76]:
+                - generic [ref=e77]: ⠋
+                - paragraph [ref=e78]: Loading…
+              - generic [ref=e80]:
+                - generic [ref=e82]: Chats
+                - button "New" [ref=e83] [cursor=pointer]:
+                  - img [ref=e84]
+                  - text: New
+  - button "Open Next.js Dev Tools" [ref=e90] [cursor=pointer]:
+    - img [ref=e91]
+  - alert [ref=e94]

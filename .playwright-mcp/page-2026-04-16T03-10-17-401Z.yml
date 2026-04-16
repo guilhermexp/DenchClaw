@@ -1,0 +1,151 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e4]:
+      - separator [ref=e5]
+      - complementary [ref=e6]:
+        - generic [ref=e7]:
+          - button "Workspace default" [ref=e95] [cursor=pointer]:
+            - generic [ref=e11]: Workspace
+            - generic [ref=e12]: default
+            - img [ref=e13]
+          - button "Hide sidebar (⌘B)" [ref=e15] [cursor=pointer]:
+            - img [ref=e16]
+        - generic [ref=e20]:
+          - generic:
+            - img
+          - textbox "Search files..." [ref=e21]
+        - generic [ref=e22]:
+          - tree [ref=e96]:
+            - treeitem ".." [ref=e97] [cursor=pointer]:
+              - img [ref=e99]
+              - generic [ref=e102]: ..
+            - treeitem "apps" [ref=e104] [cursor=pointer]:
+              - img [ref=e106]
+              - generic [ref=e109]: apps
+            - treeitem "company" [ref=e111] [cursor=pointer]:
+              - img [ref=e113]
+              - img [ref=e116]
+              - generic [ref=e118]: company
+            - treeitem "memory" [ref=e120] [cursor=pointer]:
+              - img [ref=e122]
+              - generic [ref=e125]: memory
+              - generic "Symbolic link" [ref=e126]:
+                - img [ref=e127]
+            - treeitem "people" [ref=e130] [cursor=pointer]:
+              - img [ref=e132]
+              - img [ref=e135]
+              - generic [ref=e137]: people
+            - treeitem "projects" [ref=e139] [cursor=pointer]:
+              - img [ref=e141]
+              - generic [ref=e144]: projects
+              - generic "Symbolic link" [ref=e145]:
+                - img [ref=e146]
+            - treeitem "skills" [ref=e149] [cursor=pointer]:
+              - img [ref=e151]
+              - generic [ref=e154]: skills
+            - treeitem "task" [ref=e156] [cursor=pointer]:
+              - img [ref=e158]
+              - img [ref=e161]
+              - generic [ref=e165]: task
+            - treeitem "AGENTS.md" [ref=e167] [cursor=pointer]:
+              - generic [ref=e170]: AGENTS.md
+            - treeitem "BOOTSTRAP.md" [ref=e172] [cursor=pointer]:
+              - generic [ref=e175]: BOOTSTRAP.md
+            - treeitem "HEARTBEAT.md" [ref=e177] [cursor=pointer]:
+              - generic [ref=e180]: HEARTBEAT.md
+            - treeitem "IDENTITY.md" [ref=e182] [cursor=pointer]:
+              - generic [ref=e185]: IDENTITY.md
+            - treeitem "MEMORY.md" [ref=e187] [cursor=pointer]:
+              - generic [ref=e190]: MEMORY.md
+              - generic "Symbolic link" [ref=e191]:
+                - img [ref=e192]
+            - treeitem "SOUL.md" [ref=e195] [cursor=pointer]:
+              - generic [ref=e198]: SOUL.md
+            - treeitem "TOOLS.md" [ref=e200] [cursor=pointer]:
+              - generic [ref=e203]: TOOLS.md
+            - treeitem "USER.md" [ref=e205] [cursor=pointer]:
+              - generic [ref=e208]: USER.md
+            - treeitem "workspace.duckdb" [disabled] [ref=e210] [cursor=pointer]:
+              - img [ref=e213]
+              - generic [ref=e217]: workspace.duckdb
+              - img [ref=e219]
+            - treeitem "WORKSPACE.md" [ref=e223] [cursor=pointer]:
+              - generic [ref=e226]: WORKSPACE.md
+          - status [ref=e228]
+        - generic [ref=e25]:
+          - button "Cloud" [ref=e26] [cursor=pointer]:
+            - img [ref=e28]
+            - text: Cloud
+          - button "Hermes" [ref=e30] [cursor=pointer]:
+            - img [ref=e32]
+            - text: Hermes
+          - button "Integrations" [ref=e36] [cursor=pointer]:
+            - img [ref=e38]
+            - text: Integrations
+          - button "Skills" [ref=e40] [cursor=pointer]:
+            - img [ref=e42]
+            - text: Skills
+          - button "Cron" [ref=e44] [cursor=pointer]:
+            - img [ref=e46]
+            - text: Cron
+        - generic [ref=e49]:
+          - link "dench.com (v2.5.3)" [ref=e50] [cursor=pointer]:
+            - /url: https://dench.com
+          - generic [ref=e51]:
+            - button "Show dotfiles" [ref=e52] [cursor=pointer]:
+              - img [ref=e53]
+            - button "Switch to dark mode" [ref=e58] [cursor=pointer]:
+              - img [ref=e59]
+    - main [ref=e61]:
+      - generic [ref=e62]:
+        - generic [ref=e64]:
+          - generic [ref=e230]:
+            - generic [ref=e231]:
+              - generic:
+                - generic:
+                  - img:
+                    - img
+                    - generic:
+                      - img
+                - generic [ref=e234]: Hermes
+            - button "New chat" [ref=e238] [cursor=pointer]:
+              - img [ref=e239]
+          - button "Chat history" [ref=e66] [cursor=pointer]:
+            - img [ref=e67]
+        - complementary [ref=e71]:
+          - generic [ref=e72]:
+            - separator [ref=e73]
+            - generic [ref=e74]:
+              - generic [ref=e76]:
+                - generic [ref=e241]:
+                  - generic [ref=e242]: This Week
+                  - generic [ref=e244]:
+                    - button "Oi 1d ago" [ref=e245] [cursor=pointer]:
+                      - generic [ref=e247]: Oi
+                      - generic [ref=e249]: 1d ago
+                    - button "More options" [ref=e251] [cursor=pointer]:
+                      - img [ref=e252]
+                  - generic [ref=e257]:
+                    - button "ola, tudo bem? 1d ago" [ref=e258] [cursor=pointer]:
+                      - generic [ref=e260]: ola, tudo bem?
+                      - generic [ref=e262]: 1d ago
+                    - button "More options" [ref=e264] [cursor=pointer]:
+                      - img [ref=e265]
+                - generic [ref=e269]:
+                  - generic [ref=e270]: This Month
+                  - generic [ref=e272]:
+                    - button "Eae blz? 7d ago 10 msgs" [ref=e273] [cursor=pointer]:
+                      - generic [ref=e275]: Eae blz?
+                      - generic [ref=e276]:
+                        - generic [ref=e277]: 7d ago
+                        - generic [ref=e278]: 10 msgs
+                    - button "More options" [ref=e280] [cursor=pointer]:
+                      - img [ref=e281]
+              - generic [ref=e80]:
+                - generic [ref=e82]: Chats
+                - button "New" [ref=e83] [cursor=pointer]:
+                  - img [ref=e84]
+                  - text: New
+  - button "Open Next.js Dev Tools" [ref=e90] [cursor=pointer]:
+    - img [ref=e91]
+  - alert [ref=e94]

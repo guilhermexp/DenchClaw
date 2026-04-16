@@ -3,7 +3,7 @@ import {
 	startSubscribeRun,
 	subscribeToRun,
 	type SseEvent,
-} from "@/lib/active-runs";
+} from "@/lib/hermes-bridge";
 
 export const runtime = "nodejs";
 
@@ -81,7 +81,7 @@ export async function GET(req: Request) {
 			"Content-Type": "text/event-stream",
 			"Cache-Control": "no-cache, no-transform",
 			Connection: "keep-alive",
-			"X-Run-Active": run.status === "running" || run.status === "waiting-for-subagents" ? "true" : "false",
+			"X-Run-Active": run.status === "running" ? "true" : "false",
 		},
 	});
 }

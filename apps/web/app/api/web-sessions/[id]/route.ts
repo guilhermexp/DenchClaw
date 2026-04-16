@@ -1,7 +1,7 @@
 import { readFileSync, existsSync, readdirSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { resolveWebChatDir, resolveOpenClawStateDir } from "@/lib/workspace";
-import { enrichSubagentSessionFromTranscript } from "@/lib/active-runs";
+import { enrichSubagentSessionFromTranscript } from "@/lib/hermes-bridge";
 import { readIndex, writeIndex } from "../shared";
 
 export const dynamic = "force-dynamic";

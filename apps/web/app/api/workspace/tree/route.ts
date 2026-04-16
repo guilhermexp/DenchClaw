@@ -243,17 +243,17 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const showHidden = url.searchParams.get("showHidden") === "1";
 
-  const openclawDir = resolveOpenClawStateDir();
+  const stateDir = resolveOpenClawStateDir();
   const workspace = getActiveWorkspaceName();
   const root = resolveWorkspaceRoot();
   if (!root) {
     const tree: TreeNode[] = [];
-    return Response.json({ tree, exists: false, workspaceRoot: null, openclawDir, workspace });
+    return Response.json({ tree, exists: false, workspaceRoot: null, stateDir, openclawDir: stateDir, workspace });
   }
 
   const dbObjects = await loadDbObjects();
 
   const tree = await buildTree(root, "", dbObjects, showHidden);
 
-  return Response.json({ tree, exists: true, workspaceRoot: root, openclawDir, workspace });
+  return Response.json({ tree, exists: true, workspaceRoot: root, stateDir, openclawDir: stateDir, workspace });
 }

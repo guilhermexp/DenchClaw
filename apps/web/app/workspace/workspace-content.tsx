@@ -439,7 +439,7 @@ function WorkspacePageInner() {
   const {
     tree, loading: treeLoading, exists: workspaceExists, refresh: refreshTree,
     reconnect: reconnectWorkspaceWatcher,
-    browseDir, setBrowseDir, parentDir: browseParentDir, workspaceRoot, openclawDir,
+    browseDir, setBrowseDir, parentDir: browseParentDir, workspaceRoot, stateDir,
     activeWorkspace: workspaceName,
     showHidden, setShowHidden,
   } = useWorkspaceWatcher();
@@ -1229,7 +1229,7 @@ function WorkspacePageInner() {
   const handleNavigate = useCallback((target: "cloud" | "ai-models" | "integrations" | "skills" | "cron") => {
     const config = {
       cloud: { path: "~cloud", name: "Cloud", kind: "cloud" as const },
-      "ai-models": { path: "~ai-models", name: "AI Models", kind: "ai-models" as const },
+      "ai-models": { path: "~hermes", name: "Hermes", kind: "ai-models" as const },
       integrations: { path: "~integrations", name: "Integrations", kind: "integrations" as const },
       skills: { path: "~skills", name: "Skills", kind: "skill-store" as const },
       cron: { path: "~cron", name: "Cron", kind: "cron-dashboard" as const },
@@ -1263,9 +1263,9 @@ function WorkspacePageInner() {
           setBrowseDir(null);
           return;
         }
-        if (openclawDir) {
+        if (stateDir) {
           // Clicking any web-chat directory → switch to workspace mode & open chats
-          if (openclawDir && node.path.startsWith(openclawDir + "/web-chat")) {
+          if (stateDir && node.path.startsWith(stateDir + "/web-chat")) {
             setBrowseDir(null);
             setActivePath(null);
             setContent({ kind: "none" });
@@ -1328,7 +1328,7 @@ function WorkspacePageInner() {
         handleNavigate("cloud");
         return;
       }
-      if (node.path === "~ai-models") {
+      if (node.path === "~hermes" || node.path === "~ai-models") {
         handleNavigate("ai-models");
         return;
       }
@@ -1340,7 +1340,7 @@ function WorkspacePageInner() {
       openTabForNode(node);
       void loadContent(node);
     },
-    [loadContent, openBlankChatTab, openSessionChatTab, openTabForNode, cronJobs, browseDir, workspaceRoot, openclawDir, setBrowseDir, handleNavigate],
+    [loadContent, openBlankChatTab, openSessionChatTab, openTabForNode, cronJobs, browseDir, workspaceRoot, stateDir, setBrowseDir, handleNavigate],
   );
 
   const applyActivatedTab = useCallback((tab: Tab | undefined) => {
@@ -1372,7 +1372,7 @@ function WorkspacePageInner() {
         setContent({ kind: "integrations" });
       } else if (tab.path === "~cloud") {
         setContent({ kind: "cloud" });
-      } else if (tab.path === "~ai-models") {
+      } else if (tab.path === "~hermes" || tab.path === "~ai-models") {
         setContent({ kind: "ai-models" });
       } else if (tab.path.startsWith("~cron/")) {
         const jobId = tab.path.slice("~cron/".length);
@@ -1834,9 +1834,9 @@ function WorkspacePageInner() {
         openTabForNode({ path: "~cloud", name: "Cloud", type: "folder" });
         setActivePath("~cloud");
         setContent({ kind: "cloud" });
-      } else if (urlState.path === "~ai-models") {
-        openTabForNode({ path: "~ai-models", name: "AI Models", type: "folder" });
-        setActivePath("~ai-models");
+      } else if (urlState.path === "~hermes" || urlState.path === "~ai-models") {
+        openTabForNode({ path: "~hermes", name: "Hermes", type: "folder" });
+        setActivePath("~hermes");
         setContent({ kind: "ai-models" });
       } else if (isAbsolutePath(urlState.path) || isHomeRelativePath(urlState.path)) {
         const name = urlState.path.split("/").pop() || urlState.path;
@@ -1937,9 +1937,9 @@ function WorkspacePageInner() {
           openTabForNode({ path: "~cloud", name: "Cloud", type: "folder" });
           setActivePath("~cloud");
           setContent({ kind: "cloud" });
-        } else if (urlState.path === "~ai-models") {
-          openTabForNode({ path: "~ai-models", name: "AI Models", type: "folder" });
-          setActivePath("~ai-models");
+        } else if (urlState.path === "~hermes" || urlState.path === "~ai-models") {
+          openTabForNode({ path: "~hermes", name: "Hermes", type: "folder" });
+          setActivePath("~hermes");
           setContent({ kind: "ai-models" });
         } else if (isAbsolutePath(urlState.path) || isHomeRelativePath(urlState.path)) {
           const name = urlState.path.split("/").pop() || urlState.path;

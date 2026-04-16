@@ -1,6 +1,6 @@
 ---
 name: agent-builder
-description: Build AI-powered DenchClaw apps that interact with the OpenClaw agent — create chat sessions, send and receive messages with streaming, expose app tools for agent invocation, and access agent memory.
+description: Build AI-powered DenchClaw apps that interact with the DenchClaw/Hermes agent runtime — create chat sessions, send and receive messages with streaming, expose app tools for agent invocation, and access agent memory.
 metadata: { "openclaw": { "inject": true, "always": true, "emoji": "🤖" } }
 ---
 
@@ -126,7 +126,7 @@ For advanced apps that want to build their own chat UI or need direct Gateway ac
 
 ```javascript
 const ws = new WebSocket("ws://127.0.0.1:18789");
-// Port is configurable via gateway.port in ~/.openclaw-dench/openclaw.json
+// If you need the runtime port/config, inspect the current DenchClaw/Hermes workspace configuration instead of assuming a legacy OpenClaw config path.
 ```
 
 ### Frame Types

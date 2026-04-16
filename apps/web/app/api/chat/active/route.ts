@@ -4,7 +4,7 @@
  * Returns the session IDs of all currently running agent sessions.
  * Used by the sidebar to show streaming indicators.
  */
-import { getRunningSessionIds } from "@/lib/active-runs";
+import { getRunningSessionIds } from "@/lib/hermes-bridge";
 
 export const runtime = "nodejs";
 

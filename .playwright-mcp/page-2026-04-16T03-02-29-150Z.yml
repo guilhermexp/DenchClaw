@@ -1,0 +1,58 @@
+- generic [ref=e3]:
+  - link "Skip to Main Content" [ref=e4] [cursor=pointer]:
+    - /url: "#main-content"
+  - generic [ref=e5]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - generic [ref=e8]:
+          - img [ref=e10]
+          - status [ref=e13]
+          - button "Add company" [ref=e16]:
+            - img [ref=e17]
+        - complementary [ref=e19]:
+          - generic [ref=e20]:
+            - img [ref=e21]
+            - generic [ref=e24]: Instance Settings
+          - navigation [ref=e25]:
+            - generic [ref=e26]:
+              - link "General" [ref=e27] [cursor=pointer]:
+                - /url: /instance/settings/general
+                - img [ref=e29]
+                - generic [ref=e30]: General
+              - link "Heartbeats" [ref=e31] [cursor=pointer]:
+                - /url: /instance/settings/heartbeats
+                - img [ref=e33]
+                - generic [ref=e36]: Heartbeats
+              - link "Experimental" [ref=e37] [cursor=pointer]:
+                - /url: /instance/settings/experimental
+                - img [ref=e39]
+                - generic [ref=e41]: Experimental
+              - link "Plugins" [ref=e42] [cursor=pointer]:
+                - /url: /instance/settings/plugins
+                - img [ref=e44]
+                - generic [ref=e46]: Plugins
+      - generic [ref=e48]:
+        - link "Documentation" [ref=e49] [cursor=pointer]:
+          - /url: https://docs.paperclip.ing/
+          - img [ref=e50]
+          - generic [ref=e52]: Documentation
+        - generic [ref=e53]: v
+        - link "Instance settings" [ref=e54] [cursor=pointer]:
+          - /url: /instance/settings/general
+          - img
+        - button "Switch to light mode" [ref=e55]:
+          - img
+    - generic [ref=e56]:
+      - navigation "breadcrumb" [ref=e60]:
+        - list [ref=e61]:
+          - listitem [ref=e62]:
+            - link "Instance Settings" [disabled] [ref=e63]
+          - listitem [ref=e64]:
+            - img [ref=e65]
+          - listitem [ref=e67]:
+            - link "General" [disabled] [ref=e68]
+      - main [ref=e70]:
+        - generic [ref=e71]: Loading general settings...
+  - generic [ref=e72]:
+    - heading "Command Palette" [level=2] [ref=e73]
+    - paragraph [ref=e74]: Search for a command to run...

@@ -1,0 +1,139 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e4]:
+      - separator [ref=e5]
+      - complementary [ref=e6]:
+        - generic [ref=e7]:
+          - button "Workspace default" [ref=e10] [cursor=pointer]:
+            - generic [ref=e11]: Workspace
+            - generic [ref=e12]: default
+            - img [ref=e13]
+          - button "Hide sidebar (⌘B)" [ref=e15] [cursor=pointer]:
+            - img [ref=e16]
+        - generic [ref=e20]:
+          - generic:
+            - img
+          - textbox "Search files..." [ref=e21]
+        - generic [ref=e22]:
+          - tree [ref=e99]:
+            - treeitem ".." [ref=e100] [cursor=pointer]:
+              - img [ref=e102]
+              - generic [ref=e105]: ..
+            - treeitem "skills" [ref=e107] [cursor=pointer]:
+              - img [ref=e109]
+              - generic [ref=e112]: skills
+            - treeitem "AGENTS.md" [ref=e114] [cursor=pointer]:
+              - generic [ref=e117]: AGENTS.md
+            - treeitem "BOOTSTRAP.md" [ref=e119] [cursor=pointer]:
+              - generic [ref=e122]: BOOTSTRAP.md
+            - treeitem "HEARTBEAT.md" [ref=e124] [cursor=pointer]:
+              - generic [ref=e127]: HEARTBEAT.md
+            - treeitem "IDENTITY.md" [ref=e129] [cursor=pointer]:
+              - generic [ref=e132]: IDENTITY.md
+            - treeitem "SOUL.md" [ref=e134] [cursor=pointer]:
+              - generic [ref=e137]: SOUL.md
+            - treeitem "TOOLS.md" [ref=e139] [cursor=pointer]:
+              - generic [ref=e142]: TOOLS.md
+            - treeitem "USER.md" [ref=e144] [cursor=pointer]:
+              - generic [ref=e147]: USER.md
+          - status [ref=e149]
+        - generic [ref=e25]:
+          - button "Cloud" [ref=e26] [cursor=pointer]:
+            - img [ref=e28]
+            - text: Cloud
+          - button "Hermes" [active] [ref=e30] [cursor=pointer]:
+            - img [ref=e32]
+            - text: Hermes
+          - button "Integrations" [ref=e36] [cursor=pointer]:
+            - img [ref=e38]
+            - text: Integrations
+          - button "Skills" [ref=e40] [cursor=pointer]:
+            - img [ref=e42]
+            - text: Skills
+          - button "Cron" [ref=e44] [cursor=pointer]:
+            - img [ref=e46]
+            - text: Cron
+        - generic [ref=e49]:
+          - link "dench.com (v2.5.3)" [ref=e50] [cursor=pointer]:
+            - /url: https://dench.com
+          - generic [ref=e51]:
+            - button "Show dotfiles" [ref=e52] [cursor=pointer]:
+              - img [ref=e53]
+            - button "Switch to dark mode" [ref=e58] [cursor=pointer]:
+              - img [ref=e59]
+    - main [ref=e61]:
+      - generic [ref=e63]:
+        - generic [ref=e151]:
+          - generic [ref=e152]:
+            - generic:
+              - generic:
+                - img:
+                  - img
+                  - generic:
+                    - img
+              - generic [ref=e155]: Hermes
+          - button "New chat" [ref=e159] [cursor=pointer]:
+            - img [ref=e160]
+        - generic [ref=e216]:
+          - navigation [ref=e217]:
+            - button "All Chats" [ref=e218] [cursor=pointer]
+            - generic [ref=e219]:
+              - img [ref=e220]
+              - generic [ref=e222]: ~hermes
+          - button "Back to chat" [ref=e224] [cursor=pointer]:
+            - img [ref=e225]
+        - generic [ref=e230]:
+          - generic [ref=e231]:
+            - generic [ref=e232]:
+              - heading "Hermes" [level=1] [ref=e233]
+              - paragraph [ref=e234]: Esta área substitui a antiga tela de modelos por leitura direta da configuração real do Hermes em ~/.hermes/config.yaml.
+            - button "Refresh Hermes config" [ref=e235] [cursor=pointer]
+          - generic [ref=e236]:
+            - generic [ref=e237]: CLI detected
+            - generic [ref=e238]: config.yaml found
+            - generic [ref=e239]: ACP available
+          - generic [ref=e240]:
+            - generic [ref=e241]:
+              - generic [ref=e242]: Default model
+              - generic [ref=e243]: gpt-5.4
+            - generic [ref=e244]:
+              - generic [ref=e245]: Provider
+              - generic [ref=e246]: openai-codex
+            - generic [ref=e247]:
+              - generic [ref=e248]: Base URL
+              - generic [ref=e249]: https://chatgpt.com/backend-api/codex/
+            - generic [ref=e250]:
+              - generic [ref=e251]: Hermes home
+              - generic [ref=e252]: /Users/guilhermevarela/.hermes
+            - generic [ref=e253]:
+              - generic [ref=e254]: Config path
+              - generic [ref=e255]: /Users/guilhermevarela/.hermes/config.yaml
+            - generic [ref=e256]:
+              - generic [ref=e257]: CLI path
+              - generic [ref=e258]: /Users/guilhermevarela/.local/bin/hermes
+          - generic [ref=e259]:
+            - generic [ref=e260]:
+              - generic [ref=e261]:
+                - generic [ref=e262]:
+                  - heading "Providers from Hermes config" [level=2] [ref=e263]
+                  - paragraph [ref=e264]: Providers declared inside ~/.hermes/config.yaml.
+                - generic [ref=e265]: 0 detected
+              - generic [ref=e266]: No named providers found in the Hermes config file.
+            - generic [ref=e267]:
+              - generic [ref=e268]:
+                - heading "Runtime summary" [level=2] [ref=e269]
+                - generic [ref=e270]:
+                  - generic [ref=e271]: "CLI version: Hermes Agent v0.9.0 (2026.4.13) Project: /Users/guilhermevarela/.hermes/hermes-agent Python: 3.11.14 OpenAI SDK: 2.31.0 Update available: 160 commits behind — run 'hermes update'"
+                  - generic [ref=e272]: "Toolsets: hermes-cli"
+                  - generic [ref=e273]: "Fallback providers: None configured"
+                  - generic [ref=e274]: ".env path: /Users/guilhermevarela/.hermes/.env"
+              - generic [ref=e275]:
+                - heading "Notes" [level=2] [ref=e276]
+                - list [ref=e277]:
+                  - listitem [ref=e278]:
+                    - generic [ref=e279]: •
+                    - generic [ref=e280]: Arquivo ~/.hermes/.env detectado para credenciais adicionais.
+                  - listitem [ref=e281]:
+                    - generic [ref=e282]: •
+                    - generic [ref=e283]: Esta seção lê a configuração real do Hermes; não remove nem migra arquivos legados do workspace.
+  - alert [ref=e98]

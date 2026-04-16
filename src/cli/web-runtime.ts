@@ -22,7 +22,7 @@ import { sleep } from "../utils.js";
 import { flattenPnpmStandaloneDeps } from "./flatten-standalone-deps.js";
 import { listPortListeners, type PortProcess } from "./ports.js";
 
-export const DEFAULT_WEB_APP_PORT = 3100;
+export const DEFAULT_WEB_APP_PORT = 3010;
 const WEB_RUNTIME_DIRNAME = "web-runtime";
 const WEB_RUNTIME_APP_DIRNAME = "app";
 const WEB_RUNTIME_APP_BACKUP_DIRNAME = "app.prev";

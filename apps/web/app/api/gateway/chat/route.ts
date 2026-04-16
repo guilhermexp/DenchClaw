@@ -4,7 +4,7 @@ import {
 	subscribeToRun,
 	reactivateSubscribeRun,
 	type SseEvent,
-} from "@/lib/active-runs";
+} from "@/lib/hermes-bridge";
 
 export const runtime = "nodejs";
 

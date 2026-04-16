@@ -1,0 +1,55 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e4]:
+      - separator [ref=e5]
+      - complementary [ref=e6]:
+        - generic [ref=e7]:
+          - button "Workspace -" [ref=e10] [cursor=pointer]:
+            - generic [ref=e11]: Workspace
+            - generic [ref=e12]: "-"
+            - img [ref=e13]
+          - button "Hide sidebar (⌘B)" [ref=e15] [cursor=pointer]:
+            - img [ref=e16]
+        - generic [ref=e20]:
+          - generic:
+            - img
+          - textbox "Search files..." [ref=e21]
+        - generic [ref=e24]: ⠋
+        - generic [ref=e25]:
+          - button "Cloud" [ref=e26] [cursor=pointer]:
+            - img [ref=e28]
+            - text: Cloud
+          - button "Hermes" [ref=e30] [cursor=pointer]:
+            - img [ref=e32]
+            - text: Hermes
+          - button "Integrations" [ref=e36] [cursor=pointer]:
+            - img [ref=e38]
+            - text: Integrations
+          - button "Skills" [ref=e40] [cursor=pointer]:
+            - img [ref=e42]
+            - text: Skills
+          - button "Cron" [ref=e44] [cursor=pointer]:
+            - img [ref=e46]
+            - text: Cron
+        - generic [ref=e49]:
+          - link "dench.com (v2.5.3)" [ref=e50] [cursor=pointer]:
+            - /url: https://dench.com
+          - button "Show dotfiles" [ref=e52] [cursor=pointer]:
+            - img [ref=e53]
+    - main [ref=e59]:
+      - generic [ref=e60]:
+        - button "Chat history" [ref=e64] [cursor=pointer]:
+          - img [ref=e65]
+        - complementary [ref=e69]:
+          - generic [ref=e70]:
+            - separator [ref=e71]
+            - generic [ref=e72]:
+              - generic [ref=e74]:
+                - generic [ref=e75]: ⠋
+                - paragraph [ref=e76]: Loading…
+              - generic [ref=e78]:
+                - generic [ref=e80]: Chats
+                - button "New" [ref=e81] [cursor=pointer]:
+                  - img [ref=e82]
+                  - text: New
+  - alert [ref=e83]

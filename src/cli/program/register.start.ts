@@ -1,24 +1,21 @@
 import type { Command } from "commander";
 import { defaultRuntime } from "../../runtime.js";
 import { runCommandWithRuntime } from "../cli-utils.js";
-import { startWebRuntimeCommand } from "../web-runtime-command.js";
+import { startCommand } from "../bootstrap.js";
 
 export function registerStartCommand(program: Command) {
   program
     .command("start")
-    .description("Start Dench managed web runtime without updating assets")
-    .option("--profile <name>", "Compatibility flag; non-dench values are ignored with a warning")
+    .description("Start Dench managed web runtime with Hermes configured for this workspace")
+    .option("--profile <name>", "Compatibility flag; ignored")
     .option("--web-port <port>", "Web runtime port override")
     .option("--no-open", "Do not open the browser automatically")
-    .option("--skip-daemon-install", "Skip gateway daemon/service management (for containers or environments without systemd/launchd)", false)
+    .option("--skip-daemon-install", "Ignored (Hermes setup does not use the old gateway daemon)", false)
     .option("--json", "Output summary as JSON", false)
     .action(async (opts) => {
       await runCommandWithRuntime(defaultRuntime, async () => {
-        await startWebRuntimeCommand({
-          profile: opts.profile as string | undefined,
+        await startCommand({
           webPort: opts.webPort as string | undefined,
-          noOpen: Boolean(opts.open === false),
-          skipDaemonInstall: Boolean(opts.skipDaemonInstall),
           json: Boolean(opts.json),
         });
       });

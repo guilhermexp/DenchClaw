@@ -1,0 +1,85 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e4]:
+      - button "Workspace default" [ref=e8] [cursor=pointer]:
+        - generic [ref=e9]: Workspace
+        - generic [ref=e10]: default
+        - img [ref=e11]
+      - generic [ref=e14]: No files in workspace
+      - generic [ref=e15]:
+        - button "Cloud" [ref=e16] [cursor=pointer]:
+          - img [ref=e18]
+          - text: Cloud
+        - button "Hermes" [ref=e20] [cursor=pointer]:
+          - img [ref=e22]
+          - text: Hermes
+        - button "Integrations" [ref=e26] [cursor=pointer]:
+          - img [ref=e28]
+          - text: Integrations
+        - button "Skills" [ref=e30] [cursor=pointer]:
+          - img [ref=e32]
+          - text: Skills
+        - button "Cron" [ref=e34] [cursor=pointer]:
+          - img [ref=e36]
+          - text: Cron
+      - generic [ref=e39]:
+        - link "dench.com (v2.5.3)" [ref=e40] [cursor=pointer]:
+          - /url: https://dench.com
+        - button "Switch to dark mode" [ref=e42] [cursor=pointer]:
+          - img [ref=e43]
+    - main [ref=e45]:
+      - generic [ref=e48]:
+        - generic [ref=e49]:
+          - generic [ref=e50]:
+            - heading "Hermes" [level=1] [ref=e51]
+            - paragraph [ref=e52]: Esta área substitui a antiga tela de modelos por leitura direta da configuração real do Hermes em ~/.hermes/config.yaml.
+          - button "Refresh Hermes config" [ref=e53] [cursor=pointer]
+        - generic [ref=e54]:
+          - generic [ref=e55]: CLI detected
+          - generic [ref=e56]: config.yaml found
+          - generic [ref=e57]: ACP available
+        - generic [ref=e58]:
+          - generic [ref=e59]:
+            - generic [ref=e60]: Default model
+            - generic [ref=e61]: gpt-5.4
+          - generic [ref=e62]:
+            - generic [ref=e63]: Provider
+            - generic [ref=e64]: openai-codex
+          - generic [ref=e65]:
+            - generic [ref=e66]: Base URL
+            - generic [ref=e67]: https://chatgpt.com/backend-api/codex/
+          - generic [ref=e68]:
+            - generic [ref=e69]: Hermes home
+            - generic [ref=e70]: /Users/guilhermevarela/.hermes
+          - generic [ref=e71]:
+            - generic [ref=e72]: Config path
+            - generic [ref=e73]: /Users/guilhermevarela/.hermes/config.yaml
+          - generic [ref=e74]:
+            - generic [ref=e75]: CLI path
+            - generic [ref=e76]: /Users/guilhermevarela/.local/bin/hermes
+        - generic [ref=e77]:
+          - generic [ref=e78]:
+            - generic [ref=e79]:
+              - generic [ref=e80]:
+                - heading "Providers from Hermes config" [level=2] [ref=e81]
+                - paragraph [ref=e82]: Providers declared inside ~/.hermes/config.yaml.
+              - generic [ref=e83]: 0 detected
+            - generic [ref=e84]: No named providers found in the Hermes config file.
+          - generic [ref=e85]:
+            - generic [ref=e86]:
+              - heading "Runtime summary" [level=2] [ref=e87]
+              - generic [ref=e88]:
+                - generic [ref=e89]: "CLI version: Hermes Agent v0.9.0 (2026.4.13) Project: /Users/guilhermevarela/.hermes/hermes-agent Python: 3.11.14 OpenAI SDK: 2.31.0 Update available: 160 commits behind — run 'hermes update'"
+                - generic [ref=e90]: "Toolsets: hermes-cli"
+                - generic [ref=e91]: "Fallback providers: None configured"
+                - generic [ref=e92]: ".env path: /Users/guilhermevarela/.hermes/.env"
+            - generic [ref=e93]:
+              - heading "Notes" [level=2] [ref=e94]
+              - list [ref=e95]:
+                - listitem [ref=e96]:
+                  - generic [ref=e97]: •
+                  - generic [ref=e98]: Arquivo ~/.hermes/.env detectado para credenciais adicionais.
+                - listitem [ref=e99]:
+                  - generic [ref=e100]: •
+                  - generic [ref=e101]: Esta seção lê a configuração real do Hermes; não remove nem migra arquivos legados do workspace.
+  - alert [ref=e102]

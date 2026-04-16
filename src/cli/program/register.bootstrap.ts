@@ -8,26 +8,26 @@ import { runCommandWithRuntime } from "../cli-utils.js";
 export function registerBootstrapCommand(program: Command) {
   program
     .command("bootstrap")
-    .description("Bootstrap DenchClaw on top of OpenClaw and open the web UI")
-    .option("--profile <name>", "Compatibility flag; non-dench values are ignored with a warning")
+    .description("Bootstrap DenchClaw with Hermes AI and open the web UI")
+    .option("--profile <name>", "Compatibility flag; ignored (Hermes has no profiles)")
     .option("--force-onboard", "Run onboarding even if config already exists", false)
     .option("--non-interactive", "Skip prompts where possible", false)
     .option("--yes", "Auto-approve install prompts", false)
     .option("--skip-update", "Skip update prompt/check", false)
-    .option("--update-now", "Run OpenClaw update before onboarding", false)
-    .option("--gateway-port <port>", "Gateway port override for first-run onboarding")
-    .option("--web-port <port>", "Preferred web UI port (default: 3100)")
-    .option("--dench-cloud", "Configure Dench Cloud and skip OpenClaw provider onboarding", false)
-    .option("--dench-cloud-api-key <key>", "Dench Cloud API key for bootstrap-driven setup")
-    .option("--dench-cloud-model <id>", "Stable or public Dench Cloud model id to use as default")
-    .option("--dench-gateway-url <url>", "Override the Dench Cloud gateway base URL")
-    .option("--skip-daemon-install", "Skip gateway daemon/service installation (for containers or environments without systemd/launchd)", false)
+    .option("--update-now", "Ignored (Hermes does not need update)", false)
+    .option("--gateway-port <port>", "Ignored (no gateway; Hermes uses HTTP API)")
+    .option("--web-port <port>", "Preferred web UI port (default: 3010)")
+    .option("--dench-cloud", "Configure Dench Cloud and skip provider onboarding", false)
+    .option("--dench-cloud-api-key <key>", "Hermes API key for bootstrap-driven setup")
+    .option("--dench-cloud-model <id>", "Hermes model id to use as default")
+    .option("--dench-gateway-url <url>", "Override the Hermes API base URL")
+    .option("--skip-daemon-install", "Ignored (no gateway daemon needed)", false)
     .option("--no-open", "Do not open the browser automatically")
     .option("--json", "Output summary as JSON", false)
     .addHelpText(
       "after",
       () =>
-        `\n${theme.muted("Docs:")} ${formatDocsLink("/cli/onboard", "docs.openclaw.ai/cli/onboard")}\n`,
+        `\n${theme.muted("Docs:")} ${formatDocsLink("/cli/onboard", "docs.denchclaw.ai/cli/onboard")}\n`,
     )
     .action(async (opts) => {
       await runCommandWithRuntime(defaultRuntime, async () => {

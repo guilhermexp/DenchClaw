@@ -4,7 +4,7 @@
  * Abort an active agent run. Called by the Stop button.
  * Works for both parent sessions (by sessionId) and subagent sessions (by sessionKey).
  */
-import { abortRun, getActiveRun } from "@/lib/active-runs";
+import { abortActiveRun, getActiveRun } from "@/lib/hermes-bridge";
 import { listSubagentsForRequesterSession } from "@/lib/subagent-registry";
 import { trackServer } from "@/lib/telemetry";
 import { resolveActiveAgentId } from "@/lib/workspace";
@@ -25,9 +25,8 @@ export async function POST(req: Request) {
 	}
 
 	const run = getActiveRun(runKey);
-	const canAbort =
-		run?.status === "running" || run?.status === "waiting-for-subagents";
-	const aborted = canAbort ? abortRun(runKey) : false;
+	const canAbort = run?.status === "running";
+	const aborted = canAbort ? (() => { abortActiveRun(runKey); return true; })() : false;
 	let abortedChildren = 0;
 
 	if (!isSubagentSession && body.sessionId && body.cascadeChildren) {
@@ -35,9 +34,8 @@ export async function POST(req: Request) {
 		const requesterSessionKey = resolveSessionKey(body.sessionId, fallbackAgentId);
 		for (const subagent of listSubagentsForRequesterSession(requesterSessionKey)) {
 			const childRun = getActiveRun(subagent.childSessionKey);
-			const canAbortChild =
-				childRun?.status === "running" || childRun?.status === "waiting-for-subagents";
-			if (canAbortChild && abortRun(subagent.childSessionKey)) {
+			if (childRun?.status === "running") {
+				abortActiveRun(subagent.childSessionKey);
 				abortedChildren += 1;
 			}
 		}

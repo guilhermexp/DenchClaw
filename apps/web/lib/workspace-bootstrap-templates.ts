@@ -1,5 +1,5 @@
 export const BOOTSTRAP_TEMPLATE_CONTENT = {
-  "AGENTS.md": "# AGENTS.md - Your Workspace\n\nThis folder is home. Treat it that way.\n",
+  "AGENTS.md": "# AGENTS.md - Your Workspace\n\nThis folder is home. Treat it that way.\n\n## Tools\n\nSkills provide your tools. Before non-trivial tasks, inspect `skills/`, read the relevant `SKILL.md`, and prefer workspace skills over generic behavior. For CRM/data work read `skills/crm/SKILL.md`; for connected apps read `skills/composio-apps/SKILL.md`; for engineering workflow/review/QA/planning read `skills/gstack/SKILL.md`.\n",
   "SOUL.md": "# SOUL.md - Who You Are\n\nDescribe the personality and behavior of your agent here.\n",
   "TOOLS.md": "# TOOLS.md - Local Notes\n\nSkills define how tools work. This file is for your specifics.\n",
   "IDENTITY.md": "# IDENTITY.md - Who Am I?\n\nFill this in during your first conversation.\n",

@@ -1,696 +1,394 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, CheckCircle2, ChevronDown, Loader2, Search } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-type ProviderId =
-  | "anthropic"
-  | "google"
-  | "nvidia"
-  | "ollama"
-  | "openai"
-  | "openai-codex"
-  | "openrouter"
-  | "venice"
-  | "xai"
-  | "zai"
-  | "minimax"
-  | "moonshot"
-  | "kimi-coding";
-
-type Provider = {
-  id: ProviderId;
-  name: string;
-  description: string;
-  authType: "api_key" | "setup_token" | "oauth" | "ollama";
-  recommended?: boolean;
-  popular?: boolean;
-  privacyFirst?: boolean;
-  localModels?: boolean;
-  placeholder?: string;
-  helpUrl?: string;
-  helpText?: string;
-  configured: boolean;
-  modelCount: number;
-};
-
-type Model = {
-  key: string;
-  provider: string;
-  providerId: ProviderId | null;
-  modelId: string;
-  name: string;
-  input: string;
-  contextWindow: number | null;
-  available: boolean;
-  local: boolean;
-  missing: boolean;
+export type HermesProviderSummary = {
+  id: string;
+  baseUrl: string | null;
+  keys: string[];
 };
 
 export type AiModelsPageState = {
-  providers: Provider[];
-  models: Model[];
-  selectedProvider: ProviderId | null;
-  primaryModel: string | null;
-  warning: string | null;
-};
-
-type RefreshInfo = {
-  attempted: boolean;
-  restarted: boolean;
-  error: string | null;
-  profile: string;
-};
-
-type Notice = {
-  tone: "success" | "warning" | "error";
-  message: string;
-};
-
-type RuntimeTestResult = {
-  ok: boolean;
+  sectionLabel: string;
+  cliAvailable: boolean;
+  cliPath: string | null;
+  cliVersion: string | null;
+  acpAvailable: boolean;
+  hermesHome: string;
+  configPath: string;
+  envPath: string;
+  configExists: boolean;
+  defaultModel: string | null;
   provider: string | null;
-  model: string | null;
-  text: string | null;
-  error: string | null;
+  baseUrl: string | null;
+  toolsets: string[];
+  fallbackProviders: string[];
+  configuredProviders: HermesProviderSummary[];
+  providersYaml: string;
+  notes: string[];
 };
 
-type SelectorOption = {
-  id: string;
-  title: string;
-  description?: string | null;
-  badge?: string | null;
-  muted?: boolean;
+type HermesDraft = {
+  defaultModel: string;
+  provider: string;
+  baseUrl: string;
+  toolsets: string;
+  fallbackProviders: string;
+  providersYaml: string;
 };
 
-function cn(...values: Array<string | false | null | undefined>): string {
-  return values.filter(Boolean).join(" ");
+function buildInitialState(): AiModelsPageState {
+  return {
+    sectionLabel: "Hermes",
+    cliAvailable: false,
+    cliPath: null,
+    cliVersion: null,
+    acpAvailable: false,
+    hermesHome: "~/.hermes",
+    configPath: "~/.hermes/config.yaml",
+    envPath: "~/.hermes/.env",
+    configExists: false,
+    defaultModel: null,
+    provider: null,
+    baseUrl: null,
+    toolsets: [],
+    fallbackProviders: [],
+    configuredProviders: [],
+    providersYaml: "{}",
+    notes: ["Loading Hermes configuration..."],
+  };
 }
 
-function toneClass(tone: Notice["tone"]): string {
-  if (tone === "success") return "border-emerald-500/25 bg-emerald-500/10 text-emerald-200";
-  if (tone === "warning") return "border-amber-500/25 bg-amber-500/10 text-amber-200";
-  return "border-red-500/25 bg-red-500/10 text-red-200";
+function stateToDraft(state: AiModelsPageState): HermesDraft {
+  return {
+    defaultModel: state.defaultModel ?? "",
+    provider: state.provider ?? "",
+    baseUrl: state.baseUrl ?? "",
+    toolsets: state.toolsets.join(", "),
+    fallbackProviders: state.fallbackProviders.join(", "),
+    providersYaml: state.providersYaml || "{}",
+  };
 }
 
-function normalizeKeyLabel(value: string): string {
+function splitCommaList(value: string): string[] {
   return value
-    .split(/[/:_-]+/g)
-    .filter(Boolean)
-    .map((part) => {
-      if (/^gpt\d/i.test(part)) {
-        return part.toUpperCase();
-      }
-      if (/^\d+(\.\d+)?$/.test(part)) {
-        return part;
-      }
-      return part.charAt(0).toUpperCase() + part.slice(1);
-    })
-    .join("-");
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
-function formatContextWindow(value: number | null): string | null {
-  if (!value) return null;
-  if (value >= 1_000_000) return `ctx ${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `ctx ${Math.round(value / 1_000)}K`;
-  return `ctx ${value}`;
-}
-
-function getTierLabel(model: Model | null): string | null {
-  if (!model) return null;
-  const haystack = `${model.name} ${model.modelId}`.toLowerCase();
-  if (haystack.includes("opus") || haystack.includes("gpt-5.4")) return "Ultra";
-  if (haystack.includes("sonnet") || haystack.includes("pro") || haystack.includes("gpt-5.1")) return "Pro";
-  if (haystack.includes("flash") || haystack.includes("mini") || haystack.includes("haiku")) return "Fast";
-  return null;
-}
-
-function sortModels(models: Model[]): Model[] {
-  return models.slice().sort((left, right) => {
-    if (left.available !== right.available) return left.available ? -1 : 1;
-    return left.name.localeCompare(right.name);
-  });
-}
-
-function useClickOutside<T extends HTMLElement>(onOutside: () => void) {
-  const ref = useRef<T | null>(null);
-
-  useEffect(() => {
-    function handlePointerDown(event: MouseEvent) {
-      if (!ref.current) return;
-      if (ref.current.contains(event.target as Node)) return;
-      onOutside();
-    }
-
-    document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
-  }, [onOutside]);
-
-  return ref;
-}
-
-function NoticeBanner({ notice }: { notice: Notice }) {
+function StatusBadge({ ok, label }: { ok: boolean; label: string }) {
   return (
-    <div className={cn("rounded-2xl border px-4 py-3 text-sm", toneClass(notice.tone))}>
-      {notice.message}
-    </div>
+    <span
+      className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium"
+      style={{
+        background: ok ? "rgba(34,197,94,0.12)" : "rgba(245,158,11,0.12)",
+        color: ok ? "rgb(34,197,94)" : "rgb(245,158,11)",
+      }}
+    >
+      {label}
+    </span>
   );
 }
 
-function Selector({
-  label,
-  placeholder,
-  value,
-  badge,
-  disabled,
-  options,
-  search,
-  onSearchChange,
-  open,
-  onToggle,
-  onSelect,
-}: {
-  label: string;
-  placeholder: string;
-  value: string | null;
-  badge?: string | null;
-  disabled?: boolean;
-  options: SelectorOption[];
-  search: string;
-  onSearchChange: (value: string) => void;
-  open: boolean;
-  onToggle: () => void;
-  onSelect: (id: string) => void;
-}) {
-  const ref = useClickOutside<HTMLDivElement>(() => {
-    if (open) onToggle();
-  });
-
+function InfoRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="space-y-2.5">
-      <div className="text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
+    <div className="flex flex-col gap-1 rounded-xl border p-3" style={{ borderColor: "var(--color-border)" }}>
+      <div className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>
         {label}
       </div>
-      <div ref={ref} className="relative">
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={onToggle}
-          className="flex h-12 w-full items-center justify-between rounded-xl border px-4 text-left transition disabled:cursor-not-allowed disabled:opacity-60"
-          style={{
-            borderColor: "var(--color-border)",
-            background: "color-mix(in oklab, var(--color-surface) 92%, black)",
-            color: "var(--color-text)",
-          }}
-        >
-          <div className="min-w-0">
-            <div className={cn("truncate text-sm", value ? "" : "opacity-60")}>
-              {value ?? placeholder}
-            </div>
-          </div>
-          <div className="ml-4 flex items-center gap-3">
-            {badge ? (
-              <span
-                className="inline-flex rounded-full px-2.5 py-1 text-xs font-medium"
-                style={{ background: "rgba(255,255,255,0.08)", color: "var(--color-text-muted)" }}
-              >
-                {badge}
-              </span>
-            ) : null}
-            <ChevronDown className={cn("h-4 w-4 shrink-0 transition", open ? "rotate-180" : "")} />
-          </div>
-        </button>
-
-        {open ? (
-          <div
-            className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-xl border"
-            style={{
-              borderColor: "rgba(255,255,255,0.12)",
-              background: "rgba(18,18,20,0.96)",
-              boxShadow: "0 16px 48px rgba(0,0,0,0.45)",
-            }}
-          >
-            <div className="border-b p-3" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
-              <label className="flex items-center gap-2 rounded-xl border px-3 py-2" style={{ borderColor: "rgba(255,255,255,0.16)" }}>
-                <Search className="h-4 w-4" style={{ color: "var(--color-text-muted)" }} />
-                <input
-                  value={search}
-                  onChange={(event) => onSearchChange(event.target.value)}
-                  placeholder="Search..."
-                  className="w-full bg-transparent text-sm outline-none"
-                  style={{ color: "var(--color-text)" }}
-                />
-              </label>
-            </div>
-            <div className="max-h-80 overflow-y-auto p-2">
-              {options.length === 0 ? (
-                <div className="px-3 py-8 text-sm" style={{ color: "var(--color-text-muted)" }}>
-                  Nothing found.
-                </div>
-              ) : (
-                options.map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => onSelect(option.id)}
-                    className="w-full rounded-xl px-3 py-2 text-left transition hover:bg-white/5"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className={cn("truncate text-sm", option.muted ? "opacity-60" : "")} style={{ color: "var(--color-text)" }}>
-                        {option.title}
-                      </div>
-                      {option.badge ? (
-                        <span
-                          className="inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium"
-                          style={{ background: "rgba(255,255,255,0.1)", color: "var(--color-text-muted)" }}
-                        >
-                          {option.badge}
-                        </span>
-                      ) : null}
-                    </div>
-                    {option.description ? (
-                      <div className="truncate pt-0.5 text-[13px]" style={{ color: "var(--color-text-muted)" }}>
-                        {option.description}
-                      </div>
-                    ) : null}
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
-        ) : null}
+      <div className={mono ? "text-sm font-medium break-all" : "text-sm font-medium"} style={{ color: "var(--color-text)" }}>
+        {value}
       </div>
     </div>
   );
 }
 
-const emptyState: AiModelsPageState = {
-  providers: [],
-  models: [],
-  selectedProvider: null,
-  primaryModel: null,
-  warning: null,
-};
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+  multiline = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  multiline?: boolean;
+}) {
+  const baseClass = "mt-2 w-full rounded-xl border px-3 py-2 text-sm outline-none transition";
+  const style = { borderColor: "var(--color-border)", color: "var(--color-text)", background: "var(--color-surface)" };
+
+  return (
+    <label className="block text-sm font-medium" style={{ color: "var(--color-text)" }}>
+      {label}
+      {multiline ? (
+        <textarea
+          aria-label={label}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder}
+          className={`${baseClass} min-h-[168px] font-mono`}
+          style={style}
+          spellCheck={false}
+        />
+      ) : (
+        <input
+          aria-label={label}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder}
+          className={baseClass}
+          style={style}
+        />
+      )}
+    </label>
+  );
+}
 
 export function AiModelsPanel({ initialState }: { initialState?: AiModelsPageState }) {
-  const resolved = initialState ?? emptyState;
-  const [data, setData] = useState<AiModelsPageState>(resolved);
-  const [loading, setLoading] = useState(!initialState);
-  const [submitting, setSubmitting] = useState(false);
-  const [notice, setNotice] = useState<Notice | null>(
-    resolved.warning ? { tone: "warning", message: resolved.warning } : null,
-  );
-  const [selectedProvider, setSelectedProvider] = useState<ProviderId | null>(
-    resolved.selectedProvider ?? resolved.providers[0]?.id ?? null,
-  );
-  const [providerMenuOpen, setProviderMenuOpen] = useState(false);
-  const [modelMenuOpen, setModelMenuOpen] = useState(false);
-  const [providerSearch, setProviderSearch] = useState("");
-  const [modelSearch, setModelSearch] = useState("");
-  const [secret, setSecret] = useState("");
-  const [baseUrl, setBaseUrl] = useState("http://127.0.0.1:11434/v1");
-  const [testingRuntime, setTestingRuntime] = useState(false);
+  const [data, setData] = useState<AiModelsPageState>(initialState ?? buildInitialState());
+  const [draft, setDraft] = useState<HermesDraft>(stateToDraft(initialState ?? buildInitialState()));
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
-  const provider = useMemo(
-    () => data.providers.find((entry) => entry.id === selectedProvider) ?? null,
-    [data.providers, selectedProvider],
-  );
+  const hydrate = useCallback((next: AiModelsPageState) => {
+    setData(next);
+    setDraft(stateToDraft(next));
+  }, []);
 
-  const providerModels = useMemo(() => {
-    const normalized = modelSearch.trim().toLowerCase();
-    return sortModels(
-      data.models.filter((model) => model.providerId === selectedProvider).filter((model) => {
-        if (!normalized) return true;
-        return `${model.name} ${model.key}`.toLowerCase().includes(normalized);
-      }),
-    );
-  }, [data.models, modelSearch, selectedProvider]);
-
-  const activeModel = useMemo(
-    () => data.models.find((model) => model.key === data.primaryModel) ?? null,
-    [data.models, data.primaryModel],
-  );
-
-  const selectedModelForProvider = useMemo(
-    () => providerModels.find((model) => model.key === data.primaryModel) ?? activeModel,
-    [activeModel, data.primaryModel, providerModels],
-  );
-
-  const providerOptions = useMemo(() => {
-    const normalized = providerSearch.trim().toLowerCase();
-    return data.providers
-      .filter((entry) => {
-        if (!normalized) return true;
-        return `${entry.name} ${entry.description}`.toLowerCase().includes(normalized);
-      })
-      .map((entry) => ({
-        id: entry.id,
-        title: entry.name,
-        description: entry.description,
-        badge: entry.recommended
-          ? "Recommended"
-          : entry.popular
-            ? "Popular"
-            : entry.localModels
-              ? "Local models"
-              : entry.privacyFirst
-                ? "Privacy First"
-                : null,
-      }));
-  }, [data.providers, providerSearch]);
-
-  const modelOptions = useMemo(() => {
-    return providerModels.map((model) => ({
-      id: model.key,
-      title: model.name,
-      description: [formatContextWindow(model.contextWindow), model.input.includes("image") ? "vision" : null]
-        .filter(Boolean)
-        .join(" · "),
-      badge: getTierLabel(model),
-      muted: !model.available,
-    }));
-  }, [providerModels]);
-
-  const providerStatusLabel = provider?.configured ? "Connected" : "Not connected";
-
-  const fetchState = useCallback(async (providerId?: ProviderId | null) => {
+  const refresh = useCallback(async () => {
     setLoading(true);
+    setError(null);
+    setSaveMessage(null);
     try {
-      const url = providerId
-        ? `/api/settings/ai-models?provider=${encodeURIComponent(providerId)}`
-        : "/api/settings/ai-models";
-      const response = await fetch(url, { cache: "no-store" });
-      const payload = (await response.json()) as AiModelsPageState | { error: string };
-      if (!response.ok || "error" in payload) {
-        throw new Error("error" in payload ? payload.error : `Failed to load AI models (${response.status})`);
+      const response = await fetch("/api/settings/hermes", { cache: "no-store" });
+      const payload = (await response.json()) as AiModelsPageState | { error?: string };
+      if (!response.ok || !("sectionLabel" in payload)) {
+        throw new Error("error" in payload && payload.error ? payload.error : "Failed to refresh Hermes config.");
       }
-      setData(payload);
-      setSelectedProvider(payload.selectedProvider ?? providerId ?? payload.providers[0]?.id ?? null);
-      setNotice(payload.warning ? { tone: "warning", message: payload.warning } : null);
-    } catch (error) {
-      setNotice({
-        tone: "error",
-        message: error instanceof Error ? error.message : "Failed to load AI Models.",
-      });
+      hydrate(payload);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to refresh Hermes config.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [hydrate]);
+
+  const save = useCallback(async () => {
+    setSaving(true);
+    setError(null);
+    setSaveMessage(null);
+    try {
+      const response = await fetch("/api/settings/hermes", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          defaultModel: draft.defaultModel,
+          provider: draft.provider,
+          baseUrl: draft.baseUrl,
+          toolsets: splitCommaList(draft.toolsets),
+          fallbackProviders: splitCommaList(draft.fallbackProviders),
+          providersYaml: draft.providersYaml,
+        }),
+      });
+      const payload = (await response.json()) as AiModelsPageState | { error?: string };
+      if (!response.ok || !("sectionLabel" in payload)) {
+        throw new Error("error" in payload && payload.error ? payload.error : "Failed to save Hermes config.");
+      }
+      hydrate(payload);
+      setSaveMessage("Hermes config saved.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save Hermes config.");
+    } finally {
+      setSaving(false);
+    }
+  }, [draft, hydrate]);
 
   useEffect(() => {
     if (!initialState) {
-      void fetchState();
+      void refresh();
     }
-  }, [initialState, fetchState]);
+  }, [initialState, refresh]);
 
-  const finishMutation = useCallback((state: AiModelsPageState, refresh: RefreshInfo, successMessage: string) => {
-    setData(state);
-    setSelectedProvider(state.selectedProvider ?? selectedProvider);
-    if (refresh.restarted) {
-      setNotice({ tone: "success", message: `${successMessage} Gateway reiniciado com sucesso.` });
-      return;
-    }
-    if (refresh.attempted) {
-      setNotice({
-        tone: "warning",
-        message: `${successMessage} O reload do gateway falhou: ${refresh.error ?? "erro desconhecido"}.`,
-      });
-      return;
-    }
-    setNotice({ tone: "success", message: successMessage });
-  }, [selectedProvider]);
-
-  const handleSaveProvider = useCallback(async () => {
-    if (!provider) return;
-    if (provider.authType === "oauth") {
-      setNotice({
-        tone: "warning",
-        message: "ChatGPT Subscription ainda depende do fluxo OAuth do OpenClaw CLI.",
-      });
-      return;
-    }
-    if (!secret.trim()) {
-      setNotice({ tone: "error", message: "Informe a credencial antes de conectar." });
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const body = provider.authType === "ollama"
-        ? { action: "save_ollama", baseUrl: baseUrl.trim(), apiKey: secret.trim() }
-        : {
-            action: "save_provider",
-            providerId: provider.id,
-            secret: secret.trim(),
-            authType: provider.authType === "setup_token" ? "token" : "api_key",
-          };
-
-      const response = await fetch("/api/settings/ai-models", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const payload = (await response.json()) as { state: AiModelsPageState; refresh: RefreshInfo; error?: string };
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Failed to save provider.");
-      }
-      setSecret("");
-      finishMutation(payload.state, payload.refresh, `${provider.name} conectado.`);
-    } catch (error) {
-      setNotice({
-        tone: "error",
-        message: error instanceof Error ? error.message : "Failed to save provider.",
-      });
-    } finally {
-      setSubmitting(false);
-    }
-  }, [baseUrl, finishMutation, provider, secret]);
-
-  const handleSelectModel = useCallback(async (modelKey: string) => {
-    setSubmitting(true);
-    try {
-      const response = await fetch("/api/settings/ai-models", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "select_model", modelKey }),
-      });
-      const payload = (await response.json()) as { state: AiModelsPageState; refresh: RefreshInfo; error?: string };
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Failed to select model.");
-      }
-      const modelName = data.models.find((model) => model.key === modelKey)?.name ?? modelKey;
-      finishMutation(payload.state, payload.refresh, `Modelo default trocado para ${modelName}.`);
-      setModelMenuOpen(false);
-    } catch (error) {
-      setNotice({
-        tone: "error",
-        message: error instanceof Error ? error.message : "Failed to select model.",
-      });
-    } finally {
-      setSubmitting(false);
-    }
-  }, [data.models, finishMutation]);
-
-  const handleTestRuntime = useCallback(async () => {
-    setTestingRuntime(true);
-    try {
-      const response = await fetch("/api/settings/ai-models", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "test_runtime" }),
-      });
-      const payload = (await response.json()) as RuntimeTestResult | { error?: string };
-      if (!response.ok || !("ok" in payload)) {
-        throw new Error("error" in payload && payload.error ? payload.error : "Runtime test failed.");
-      }
-      if (!payload.ok) {
-        throw new Error(payload.error ?? "Runtime test failed.");
-      }
-      setNotice({
-        tone: "success",
-        message: `Runtime ok: ${payload.provider ?? "unknown"}/${payload.model ?? "unknown"} respondeu "${payload.text ?? ""}".`,
-      });
-    } catch (error) {
-      setNotice({
-        tone: "error",
-        message: error instanceof Error ? error.message : "Runtime test failed.",
-      });
-    } finally {
-      setTestingRuntime(false);
-    }
-  }, []);
-
-  if (loading && data.providers.length === 0) {
-    return (
-      <div className="mx-auto max-w-5xl px-4 py-6 md:px-6 md:py-8">
-        <h1 className="text-3xl font-semibold tracking-tight" style={{ color: "var(--color-text)" }}>AI Models</h1>
-        <div className="mt-8 flex items-center gap-2" style={{ color: "var(--color-text-muted)" }}>
-          <Loader2 className="h-4 w-4 animate-spin" />
-          <span className="text-sm">Loading providers...</span>
+  const providersPreview = useMemo(() => {
+    return data.configuredProviders.length === 0
+      ? null
+      : data.configuredProviders.map((provider) => (
+        <div key={provider.id} className="rounded-xl border p-4" style={{ borderColor: "var(--color-border)" }}>
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-sm font-semibold" style={{ color: "var(--color-text)" }}>
+              {provider.id}
+            </div>
+            <div className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+              {provider.keys.length} keys
+            </div>
+          </div>
+          <div className="mt-2 text-sm" style={{ color: "var(--color-text-muted)" }}>
+            Base URL: {provider.baseUrl ?? "not set"}
+          </div>
+          <div className="mt-2 text-xs break-all" style={{ color: "var(--color-text-muted)" }}>
+            Keys: {provider.keys.join(", ") || "none"}
+          </div>
         </div>
-      </div>
-    );
-  }
+      ));
+  }, [data.configuredProviders]);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 md:px-6 md:py-8">
-      <section>
-        <div className="flex items-center justify-between gap-4">
-          <div>
+      <section className="space-y-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div className="space-y-2">
             <h1 className="text-3xl font-semibold tracking-tight" style={{ color: "var(--color-text)" }}>
-              AI Models
+              Hermes
             </h1>
+            <p className="max-w-2xl text-sm leading-6" style={{ color: "var(--color-text-muted)" }}>
+              Esta área lê a configuração real do Hermes em ~/.hermes/config.yaml e agora também permite trocar modelo, provider e providers nomeados direto pela UI.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => void refresh()}
+              disabled={loading || saving}
+              className="h-10 rounded-xl border px-4 text-sm font-medium transition disabled:opacity-60"
+              style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
+            >
+              {loading ? "Refreshing..." : "Refresh Hermes config"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void save()}
+              disabled={loading || saving}
+              className="h-10 rounded-xl px-4 text-sm font-medium transition disabled:opacity-60"
+              style={{ background: "var(--color-accent)", color: "white" }}
+            >
+              {saving ? "Saving..." : "Save Hermes config"}
+            </button>
           </div>
         </div>
 
-        <div className="mt-6 space-y-5">
-          {notice ? <NoticeBanner notice={notice} /> : null}
-
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Selector
-              label="Provider"
-              placeholder="Choose provider"
-              value={provider?.name ?? null}
-              disabled={submitting}
-              options={providerOptions}
-              search={providerSearch}
-              onSearchChange={setProviderSearch}
-              open={providerMenuOpen}
-              onToggle={() => {
-                setProviderMenuOpen((value) => !value);
-                setModelMenuOpen(false);
-              }}
-              onSelect={(id) => {
-                setSelectedProvider(id as ProviderId);
-                setProviderMenuOpen(false);
-                setProviderSearch("");
-                setModelSearch("");
-              }}
-            />
-
-            <Selector
-              label="Model"
-              placeholder={provider?.configured ? "Choose a model" : "Enter API key to choose a model"}
-              value={selectedModelForProvider?.name ?? (data.primaryModel ? normalizeKeyLabel(data.primaryModel.split("/").at(-1) ?? data.primaryModel) : null)}
-              badge={getTierLabel(selectedModelForProvider)}
-              disabled={submitting || !provider || providerModels.length === 0}
-              options={modelOptions}
-              search={modelSearch}
-              onSearchChange={setModelSearch}
-              open={modelMenuOpen}
-              onToggle={() => {
-                if (!provider || providerModels.length === 0) return;
-                setModelMenuOpen((value) => !value);
-                setProviderMenuOpen(false);
-              }}
-              onSelect={(id) => void handleSelectModel(id)}
-            />
+        {error ? (
+          <div className="rounded-2xl border px-4 py-3 text-sm" style={{ borderColor: "rgba(239,68,68,0.25)", color: "rgb(239,68,68)" }}>
+            {error}
           </div>
+        ) : null}
 
-          <div className="border-t pt-8" style={{ borderColor: "var(--color-border)" }}>
-            <div className="text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
-              {provider?.authType === "oauth" || provider?.authType === "ollama" ? "Authentication" : "API Key"}
+        {saveMessage ? (
+          <div className="rounded-2xl border px-4 py-3 text-sm" style={{ borderColor: "rgba(34,197,94,0.25)", color: "rgb(34,197,94)" }}>
+            {saveMessage}
+          </div>
+        ) : null}
+
+        <div className="flex flex-wrap gap-2">
+          <StatusBadge ok={data.cliAvailable} label={data.cliAvailable ? "CLI detected" : "CLI missing"} />
+          <StatusBadge ok={data.configExists} label={data.configExists ? "config.yaml found" : "config.yaml missing"} />
+          <StatusBadge ok={data.acpAvailable} label={data.acpAvailable ? "ACP available" : "ACP unavailable"} />
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <InfoRow label="Default model" value={data.defaultModel ?? "Not configured"} />
+          <InfoRow label="Provider" value={data.provider ?? "Not configured"} />
+          <InfoRow label="Base URL" value={data.baseUrl ?? "Not configured"} mono />
+          <InfoRow label="Hermes home" value={data.hermesHome} mono />
+          <InfoRow label="Config path" value={data.configPath} mono />
+          <InfoRow label="CLI path" value={data.cliPath ?? "Hermes not found in PATH"} mono />
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="space-y-6">
+            <div className="rounded-2xl border p-5" style={{ borderColor: "var(--color-border)" }}>
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>Editable active model config</h2>
+                  <p className="mt-1 text-sm" style={{ color: "var(--color-text-muted)" }}>
+                    Changes are persisted back to ~/.hermes/config.yaml.
+                  </p>
+                </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="Default model" value={draft.defaultModel} onChange={(value) => setDraft((current) => ({ ...current, defaultModel: value }))} placeholder="gpt-5.4" />
+                <Field label="Provider" value={draft.provider} onChange={(value) => setDraft((current) => ({ ...current, provider: value }))} placeholder="openai-codex" />
+              </div>
+              <div className="mt-4">
+                <Field label="Base URL" value={draft.baseUrl} onChange={(value) => setDraft((current) => ({ ...current, baseUrl: value }))} placeholder="https://chatgpt.com/backend-api/codex/" />
+              </div>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <Field label="Toolsets" value={draft.toolsets} onChange={(value) => setDraft((current) => ({ ...current, toolsets: value }))} placeholder="terminal, file, web" />
+                <Field label="Fallback providers" value={draft.fallbackProviders} onChange={(value) => setDraft((current) => ({ ...current, fallbackProviders: value }))} placeholder="provider-a, provider-b" />
+              </div>
             </div>
-            <div className="mt-4 flex items-center gap-3 text-sm" style={{ color: "var(--color-text-muted)" }}>
-              {provider?.configured ? (
-                <CheckCircle2 className="h-4 w-4 text-neutral-300" />
-              ) : (
-                <AlertCircle className="h-4 w-4 text-neutral-500" />
-              )}
-              <span>{providerStatusLabel}</span>
-            </div>
 
-            <div className="mt-6 space-y-4">
-              {provider?.authType === "ollama" ? (
-                <>
-                  <input
-                    value={baseUrl}
-                    onChange={(event) => setBaseUrl(event.target.value)}
-                    className="h-12 w-full rounded-xl border px-4 text-sm outline-none"
-                    style={{
-                      borderColor: "var(--color-border)",
-                      background: "color-mix(in oklab, var(--color-surface) 92%, black)",
-                      color: "var(--color-text)",
-                    }}
-                    placeholder="http://127.0.0.1:11434/v1"
-                  />
-                  <input
-                    type="password"
-                    value={secret}
-                    onChange={(event) => setSecret(event.target.value)}
-                    className="h-12 w-full rounded-xl border px-4 text-sm outline-none"
-                    style={{
-                      borderColor: "var(--color-border)",
-                      background: "color-mix(in oklab, var(--color-surface) 92%, black)",
-                      color: "var(--color-text)",
-                    }}
-                    placeholder={provider.placeholder ?? ""}
-                  />
-                </>
-              ) : provider?.authType === "oauth" ? null : (
-                <input
-                  type="password"
-                  value={secret}
-                  onChange={(event) => setSecret(event.target.value)}
-                  className="h-12 w-full rounded-xl border px-4 text-sm outline-none"
-                  style={{
-                    borderColor: "var(--color-border)",
-                    background: "color-mix(in oklab, var(--color-surface) 92%, black)",
-                    color: "var(--color-text)",
-                  }}
-                  placeholder={provider?.authType === "setup_token" ? "API Key or Setup-Token" : provider?.placeholder ?? ""}
-                />
-              )}
-
-              <button
-                type="button"
-                onClick={() => void handleSaveProvider()}
-                disabled={submitting || !provider}
-                className="h-11 w-full rounded-xl border text-sm font-medium transition disabled:opacity-60"
-                style={{
-                  borderColor: "var(--color-border)",
-                  background: "color-mix(in oklab, var(--color-surface) 92%, black)",
-                  color: "var(--color-text)",
-                }}
-              >
-                {submitting ? (
-                  <span className="inline-flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Saving...
-                  </span>
-                ) : provider?.configured ? (
-                  "Reconnect"
-                ) : (
-                  "Connect"
-                )}
-              </button>
-
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => void fetchState(selectedProvider)}
-                  disabled={loading || submitting || testingRuntime}
-                  className="h-10 rounded-xl border px-3 text-sm transition disabled:opacity-60"
-                  style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
-                >
-                  {loading ? "Refreshing..." : "Refresh"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleTestRuntime()}
-                  disabled={submitting || loading || testingRuntime}
-                  className="h-10 rounded-xl border px-3 text-sm transition disabled:opacity-60"
-                  style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
-                >
-                  {testingRuntime ? "Testing..." : "Test connection"}
-                </button>
+            <div className="rounded-2xl border p-5" style={{ borderColor: "var(--color-border)" }}>
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>Named providers from Hermes config</h2>
+                  <p className="mt-1 text-sm" style={{ color: "var(--color-text-muted)" }}>
+                    Edit the provider map as YAML. Example: provider-id, api, base_url, model, headers.
+                  </p>
+                </div>
+                <span className="text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>
+                  {data.configuredProviders.length} detected
+                </span>
               </div>
 
-              {provider?.helpText ? (
-                <p className="text-sm leading-6" style={{ color: "var(--color-text-muted)" }}>
-                  {provider.helpText}
-                </p>
-              ) : null}
+              <Field
+                label="Providers YAML"
+                value={draft.providersYaml}
+                onChange={(value) => setDraft((current) => ({ ...current, providersYaml: value }))}
+                multiline
+                placeholder={"openai-codex:\n  base_url: https://chatgpt.com/backend-api/codex/"}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div className="rounded-2xl border p-5" style={{ borderColor: "var(--color-border)" }}>
+              <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>Runtime summary</h2>
+              <div className="mt-4 space-y-3 text-sm" style={{ color: "var(--color-text-muted)" }}>
+                <div>
+                  <span className="font-medium" style={{ color: "var(--color-text)" }}>CLI version:</span>{" "}
+                  {data.cliVersion ?? "Unavailable"}
+                </div>
+                <div>
+                  <span className="font-medium" style={{ color: "var(--color-text)" }}>Toolsets:</span>{" "}
+                  {data.toolsets.length > 0 ? data.toolsets.join(", ") : "None configured"}
+                </div>
+                <div>
+                  <span className="font-medium" style={{ color: "var(--color-text)" }}>Fallback providers:</span>{" "}
+                  {data.fallbackProviders.length > 0 ? data.fallbackProviders.join(", ") : "None configured"}
+                </div>
+                <div>
+                  <span className="font-medium" style={{ color: "var(--color-text)" }}>.env path:</span>{" "}
+                  <span className="break-all">{data.envPath}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border p-5" style={{ borderColor: "var(--color-border)" }}>
+              <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>Parsed provider preview</h2>
+              <div className="mt-4 space-y-3">
+                {providersPreview ?? (
+                  <div className="rounded-xl border border-dashed p-4 text-sm" style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}>
+                    No named providers found in the Hermes config file.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border p-5" style={{ borderColor: "var(--color-border)" }}>
+              <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>Notes</h2>
+              <ul className="mt-4 space-y-2 text-sm leading-6" style={{ color: "var(--color-text-muted)" }}>
+                {data.notes.map((note, index) => (
+                  <li key={`${index}-${note}`} className="flex gap-2">
+                    <span style={{ color: "var(--color-accent)" }}>•</span>
+                    <span>{note}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         </div>

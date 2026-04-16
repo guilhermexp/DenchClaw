@@ -330,7 +330,7 @@ function buildSummary(params: {
     return {
       level: "error",
       verified: false,
-      message: `${denchIntegrationsBrand.displayName} is not registered correctly in openclaw.json.`,
+      message: `${denchIntegrationsBrand.displayName} is not registered correctly in the Hermes workspace config.`,
     };
   }
 

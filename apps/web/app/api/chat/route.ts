@@ -14,9 +14,10 @@ import {
 	persistUserMessage,
 	persistSubscribeUserMessage,
 	reactivateSubscribeRun,
+	abortActiveRun,
 	type SseEvent,
-} from "@/lib/active-runs";
-import type { ImageAttachment } from "@/lib/agent-runner";
+} from "@/lib/hermes-bridge";
+import type { ImageAttachment } from "@/lib/hermes-bridge";
 import { trackServer } from "@/lib/telemetry";
 import { existsSync, readFileSync } from "node:fs";
 import { join, basename, extname } from "node:path";
@@ -298,21 +299,21 @@ export async function POST(req: Request) {
 				} catch { /* ignore enqueue errors on closed stream */ }
 			}, 15_000);
 
-		unsubscribe = subscribeToRun(
-			runKey,
-			(event: SseEvent | null) => {
-				if (closed) {return;}
-				if (event === null) {
-						closed = true;
-						if (keepalive) { clearInterval(keepalive); keepalive = null; }
-						try { controller.close(); } catch { /* already closed */ }
-						return;
-					}
-					try {
-						const json = JSON.stringify(normalizeLiveStreamEvent(event));
-						controller.enqueue(encoder.encode(`data: ${json}\n\n`));
-					} catch { /* ignore */ }
-				},
+			unsubscribe = subscribeToRun(
+				runKey,
+				(event: SseEvent | null) => {
+					if (closed) {return;}
+					if (event === null) {
+							closed = true;
+							if (keepalive) { clearInterval(keepalive); keepalive = null; }
+							try { controller.close(); } catch { /* already closed */ }
+							return;
+						}
+						try {
+							const json = JSON.stringify(normalizeLiveStreamEvent(event));
+							controller.enqueue(encoder.encode(`data: ${json}\n\n`));
+						} catch { /* ignore */ }
+					},
 				{ replay: true },
 			);
 

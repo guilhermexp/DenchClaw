@@ -582,7 +582,7 @@ export function WorkspaceSidebar({
 							<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
 						</svg>
 					)},
-					{ id: "ai-models" as const, label: "AI Models", icon: (
+					{ id: "ai-models" as const, label: "Hermes", icon: (
 						<svg className="h-4 w-4 shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
 							<path d="M12 2 3 7l9 5 9-5-9-5Z" />
 							<path d="m3 17 9 5 9-5" />

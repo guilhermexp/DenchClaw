@@ -1,28 +1,26 @@
 import type { Command } from "commander";
 import { defaultRuntime } from "../../runtime.js";
 import { runCommandWithRuntime } from "../cli-utils.js";
-import { updateWebRuntimeCommand } from "../web-runtime-command.js";
+import { bootstrapCommand } from "../bootstrap.js";
 
 export function registerUpdateCommand(program: Command) {
   program
     .command("update")
-    .description("Update Dench managed web runtime without onboarding")
-    .option("--profile <name>", "Compatibility flag; non-dench values are ignored with a warning")
+    .description("Refresh Dench managed web runtime and Hermes workspace setup")
+    .option("--profile <name>", "Compatibility flag; ignored")
     .option("--web-port <port>", "Web runtime port override")
-    .option("--non-interactive", "Fail instead of prompting for major-gate approval", false)
-    .option("--yes", "Approve mandatory major-gate OpenClaw update", false)
+    .option("--non-interactive", "Skip interactive Hermes installer/setup prompts where possible", false)
+    .option("--yes", "Auto-approve install prompts where possible", false)
     .option("--no-open", "Do not open the browser automatically")
-    .option("--skip-daemon-install", "Skip gateway daemon/service management (for containers or environments without systemd/launchd)", false)
+    .option("--skip-daemon-install", "Ignored (Hermes setup does not use the old gateway daemon)", false)
     .option("--json", "Output summary as JSON", false)
     .action(async (opts) => {
       await runCommandWithRuntime(defaultRuntime, async () => {
-        await updateWebRuntimeCommand({
-          profile: opts.profile as string | undefined,
+        await bootstrapCommand({
           webPort: opts.webPort as string | undefined,
           nonInteractive: Boolean(opts.nonInteractive),
           yes: Boolean(opts.yes),
           noOpen: Boolean(opts.open === false),
-          skipDaemonInstall: Boolean(opts.skipDaemonInstall),
           json: Boolean(opts.json),
         });
       });

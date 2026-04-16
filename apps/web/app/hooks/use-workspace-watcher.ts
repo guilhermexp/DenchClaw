@@ -29,7 +29,7 @@ export function useWorkspaceWatcher() {
   const [browseDirRaw, setBrowseDirRaw] = useState<string | null>(null);
   const [parentDir, setParentDir] = useState<string | null>(null);
   const [workspaceRoot, setWorkspaceRoot] = useState<string | null>(null);
-  const [openclawDir, setOpenclawDir] = useState<string | null>(null);
+  const [stateDir, setStateDir] = useState<string | null>(null);
   const [activeWorkspace, setActiveWorkspace] = useState<string | null>(null);
 
   // Show hidden (dot) files/folders
@@ -55,7 +55,7 @@ export function useWorkspaceWatcher() {
         setTree(data.tree ?? []);
         setExists(data.exists ?? false);
         setWorkspaceRoot(data.workspaceRoot ?? null);
-        setOpenclawDir(data.openclawDir ?? null);
+        setStateDir(data.stateDir ?? data.openclawDir ?? null);
         setActiveWorkspace(data.workspace ?? data.profile ?? null);
         setLoading(false);
       }
@@ -217,5 +217,5 @@ export function useWorkspaceWatcher() {
     };
   }, [browseDirRaw, fetchWorkspaceTree, sseReconnectKey]);
 
-  return { tree, loading, exists, refresh, reconnect, browseDir, setBrowseDir, parentDir, workspaceRoot, openclawDir, activeWorkspace, showHidden, setShowHidden };
+  return { tree, loading, exists, refresh, reconnect, browseDir, setBrowseDir, parentDir, workspaceRoot, stateDir, activeWorkspace, showHidden, setShowHidden };
 }

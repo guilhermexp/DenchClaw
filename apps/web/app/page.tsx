@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { WorkspaceShell } from "./workspace/workspace-content";
 
 export default async function Home({
@@ -6,11 +5,7 @@ export default async function Home({
 }: {
   searchParams: Promise<{ path?: string }>;
 }) {
-  const params = await searchParams;
-
-  if (params.path === "~ai-models") {
-    redirect("/settings/ai-models");
-  }
+  await searchParams;
 
   return <WorkspaceShell />;
 }

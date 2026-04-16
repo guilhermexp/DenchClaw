@@ -10,7 +10,7 @@ export function AiModelsShell({ initialState }: { initialState: AiModelsPageStat
 
   const handleNavigate = useCallback((target: "cloud" | "ai-models" | "integrations" | "skills" | "cron") => {
     if (target === "ai-models") {
-      router.push("/settings/ai-models");
+      router.push("/settings/hermes");
       return;
     }
     if (target === "integrations") {
@@ -33,7 +33,7 @@ export function AiModelsShell({ initialState }: { initialState: AiModelsPageStat
       <div className="flex shrink-0 flex-col border-r" style={{ width: 260, minWidth: 260, borderColor: "var(--color-border)" }}>
         <WorkspaceSidebar
           tree={[]}
-          activePath="~ai-models"
+          activePath="~hermes"
           onSelect={() => {}}
           onRefresh={() => {}}
           loading={false}

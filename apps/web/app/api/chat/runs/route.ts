@@ -1,4 +1,4 @@
-import { getActiveRun } from "@/lib/active-runs";
+import { getActiveRun } from "@/lib/hermes-bridge";
 import { listSubagentsForRequesterSession } from "@/lib/subagent-registry";
 import { resolveActiveAgentId } from "@/lib/workspace";
 import { readIndex, resolveSessionKey } from "@/app/api/web-sessions/shared";
@@ -23,7 +23,7 @@ export function GET() {
         status: run.status,
       };
     })
-    .filter((run): run is { sessionId: string; status: "running" | "waiting-for-subagents" | "completed" | "error" } => Boolean(run));
+    .filter((run): run is { sessionId: string; status: "running" | "completed" | "error" } => Boolean(run));
 
   const subagents = [...parentSessionKeys.entries()]
     .flatMap(([requesterSessionKey, parentSessionId]) =>

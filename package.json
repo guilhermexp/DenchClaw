@@ -1,7 +1,7 @@
 {
   "name": "denchclaw",
   "version": "2.5.3",
-  "description": "Fully Managed OpenClaw Framework for managing your CRM, Sales Automation and Outreach agents. The only local productivity tool you need.",
+  "description": "Fully Managed Hermes AI Framework for managing your CRM, Sales Automation and Outreach agents. The only local productivity tool you need.",
   "keywords": [],
   "homepage": "https://github.com/DenchHQ/DenchClaw#readme",
   "bugs": {
@@ -40,7 +40,7 @@
     "build:plugin-env": "node scripts/build-plugin-env.mjs",
     "check": "pnpm format:check && pnpm lint",
     "denchclaw": "node denchclaw.mjs",
-    "dev": "node denchclaw.mjs",
+    "dev": "pnpm build && node denchclaw.mjs",
     "format": "oxfmt --write",
     "format:check": "oxfmt --check",
     "lint": "oxlint --type-aware",
@@ -62,13 +62,16 @@
   },
   "dependencies": {
     "@clack/prompts": "^1.0.1",
+    "@mcpc-tech/acp-ai-provider": "^0.3.2",
+    "ai": "^6.0.86",
     "axios": "^1.13.5",
     "chalk": "^5.6.2",
     "commander": "^14.0.3",
     "gradient-string": "^3.0.0",
     "json5": "^2.2.3",
     "posthog-node": "^5.27.1",
-    "tslog": "^4.10.2"
+    "tslog": "^4.10.2",
+    "yaml": "^2.8.2"
   },
   "devDependencies": {
     "@types/node": "^25.3.0",
@@ -78,9 +81,6 @@
     "tsdown": "^0.20.3",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
-  },
-  "peerDependencies": {
-    "openclaw": ">=2026.1.0"
   },
   "engines": {
     "node": ">=22.12.0"

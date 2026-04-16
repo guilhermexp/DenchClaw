@@ -1,22 +1,20 @@
 import type { Command } from "commander";
 import { defaultRuntime } from "../../runtime.js";
 import { runCommandWithRuntime } from "../cli-utils.js";
-import { stopWebRuntimeCommand } from "../web-runtime-command.js";
+import { stopCommand } from "../bootstrap.js";
 
 export function registerStopCommand(program: Command) {
   program
     .command("stop")
-    .description("Stop Dench managed web runtime on the configured port")
-    .option("--profile <name>", "Compatibility flag; non-dench values are ignored with a warning")
+    .description("Stop Dench managed web runtime")
+    .option("--profile <name>", "Compatibility flag; ignored")
     .option("--web-port <port>", "Web runtime port override")
-    .option("--skip-daemon-install", "Skip gateway daemon/service management (for containers or environments without systemd/launchd)", false)
+    .option("--skip-daemon-install", "Ignored (Hermes setup does not use the old gateway daemon)", false)
     .option("--json", "Output summary as JSON", false)
     .action(async (opts) => {
       await runCommandWithRuntime(defaultRuntime, async () => {
-        await stopWebRuntimeCommand({
-          profile: opts.profile as string | undefined,
+        await stopCommand({
           webPort: opts.webPort as string | undefined,
-          skipDaemonInstall: Boolean(opts.skipDaemonInstall),
           json: Boolean(opts.json),
         });
       });

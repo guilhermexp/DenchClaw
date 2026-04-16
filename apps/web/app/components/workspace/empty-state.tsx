@@ -136,7 +136,7 @@ export function EmptyState({
 					>
 						{expectedPath
 							? shortenPath(expectedPath)
-							: "~/.openclaw-dench/workspace-<name>"}
+							: "Hermes-managed workspace/<name>"}
 					</code>
 				</span>
 			</div>

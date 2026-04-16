@@ -1,0 +1,14 @@
+[  126492ms] [WARNING] [tiptap warn]: Duplicate extension names found: ['link']. This can lead to issues. @ http://127.0.0.1:3010/_next/static/chunks/c2d15609-28842465e7275227.js:0
+[  127555ms] [WARNING] [tiptap warn]: Duplicate extension names found: ['link']. This can lead to issues. @ http://127.0.0.1:3010/_next/static/chunks/c2d15609-28842465e7275227.js:0
+[  130877ms] [WARNING] [tiptap warn]: Duplicate extension names found: ['link']. This can lead to issues. @ http://127.0.0.1:3010/_next/static/chunks/c2d15609-28842465e7275227.js:0
+[  131676ms] [WARNING] [tiptap warn]: Duplicate extension names found: ['link']. This can lead to issues. @ http://127.0.0.1:3010/_next/static/chunks/c2d15609-28842465e7275227.js:0
+[  133041ms] [WARNING] [tiptap warn]: Duplicate extension names found: ['link']. This can lead to issues. @ http://127.0.0.1:3010/_next/static/chunks/c2d15609-28842465e7275227.js:0
+[  133858ms] [WARNING] [tiptap warn]: Duplicate extension names found: ['link']. This can lead to issues. @ http://127.0.0.1:3010/_next/static/chunks/c2d15609-28842465e7275227.js:0
+[  135495ms] [WARNING] [tiptap warn]: Duplicate extension names found: ['link']. This can lead to issues. @ http://127.0.0.1:3010/_next/static/chunks/c2d15609-28842465e7275227.js:0
+[  137542ms] [WARNING] [tiptap warn]: Duplicate extension names found: ['link']. This can lead to issues. @ http://127.0.0.1:3010/_next/static/chunks/c2d15609-28842465e7275227.js:0
+[  139196ms] [WARNING] [tiptap warn]: Duplicate extension names found: ['link']. This can lead to issues. @ http://127.0.0.1:3010/_next/static/chunks/c2d15609-28842465e7275227.js:0
+[  140902ms] [WARNING] [tiptap warn]: Duplicate extension names found: ['link']. This can lead to issues. @ http://127.0.0.1:3010/_next/static/chunks/c2d15609-28842465e7275227.js:0
+[  142829ms] [WARNING] [tiptap warn]: Duplicate extension names found: ['link']. This can lead to issues. @ http://127.0.0.1:3010/_next/static/chunks/c2d15609-28842465e7275227.js:0
+[  146834ms] [WARNING] [tiptap warn]: Duplicate extension names found: ['link']. This can lead to issues. @ http://127.0.0.1:3010/_next/static/chunks/c2d15609-28842465e7275227.js:0
+[  179004ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://127.0.0.1:3010/api/workspace/db/introspect?path=%2FUsers%2Fguilhermevarela%2F.openclaw-dench%2Ftasks%2Fruns.sqlite:0
+[  340659ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://127.0.0.1:3010/api/workspace/browse-file?path=%2FUsers%2Fguilhermevarela%2F.openclaw-dench%2Fagents:0

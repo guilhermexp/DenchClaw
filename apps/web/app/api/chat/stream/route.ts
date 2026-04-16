@@ -13,7 +13,7 @@ import {
 	startSubscribeRun,
 	subscribeToRun,
 	type SseEvent,
-} from "@/lib/active-runs";
+} from "@/lib/hermes-bridge";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { resolveOpenClawStateDir } from "@/lib/workspace";
@@ -137,7 +137,7 @@ export async function GET(req: Request) {
 			"Content-Type": "text/event-stream",
 			"Cache-Control": "no-cache, no-transform",
 			Connection: "keep-alive",
-			"X-Run-Active": run.status === "running" || run.status === "waiting-for-subagents" ? "true" : "false",
+			"X-Run-Active": run.status === "running" ? "true" : "false",
 		},
 	});
 }

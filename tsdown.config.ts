@@ -11,6 +11,7 @@ export default defineConfig([
     env,
     fixedExtension: false,
     platform: "node",
+    unbundle: true,
   },
   {
     entry: "src/infra/warning-filter.ts",

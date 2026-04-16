@@ -1,613 +1,242 @@
-import { execFile } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { homedir } from "node:os";
 import { join } from "node:path";
-import { promisify } from "node:util";
-import { resolveOpenClawStateDir } from "@/lib/workspace";
-import {
-  refreshIntegrationsRuntime,
-  readOpenClawConfigForIntegrations,
-  writeOpenClawConfigForIntegrations,
-  type IntegrationRuntimeRefresh,
-} from "./integrations";
+import YAML from "yaml";
 
-const execFileAsync = promisify(execFile);
-
-type UnknownRecord = Record<string, unknown>;
-
-export type AiModelProviderId =
-  | "anthropic"
-  | "google"
-  | "nvidia"
-  | "ollama"
-  | "openai"
-  | "openai-codex"
-  | "openrouter"
-  | "venice"
-  | "xai"
-  | "zai"
-  | "minimax"
-  | "moonshot"
-  | "kimi-coding";
-
-export type AiModelProviderInfo = {
-  id: AiModelProviderId;
-  name: string;
-  description: string;
-  authType: "api_key" | "setup_token" | "oauth" | "ollama";
-  recommended?: boolean;
-  popular?: boolean;
-  privacyFirst?: boolean;
-  localModels?: boolean;
-  placeholder?: string;
-  helpUrl?: string;
-  helpText?: string;
-};
-
-export type AiModelEntry = {
-  key: string;
-  provider: string;
-  providerId: AiModelProviderId | null;
-  modelId: string;
-  name: string;
-  input: string;
-  contextWindow: number | null;
-  available: boolean;
-  local: boolean;
-  missing: boolean;
+export type HermesProviderSummary = {
+  id: string;
+  baseUrl: string | null;
+  keys: string[];
 };
 
 export type AiModelsPageState = {
-  providers: Array<AiModelProviderInfo & { configured: boolean; modelCount: number }>;
-  models: AiModelEntry[];
-  selectedProvider: AiModelProviderId | null;
-  primaryModel: string | null;
-  warning: string | null;
-};
-
-export type AiModelsUpdateResult = {
-  state: AiModelsPageState;
-  changed: boolean;
-  refresh: IntegrationRuntimeRefresh;
-  error?: string;
-};
-
-export type AiModelsRuntimeTestResult = {
-  ok: boolean;
+  sectionLabel: string;
+  cliAvailable: boolean;
+  cliPath: string | null;
+  cliVersion: string | null;
+  acpAvailable: boolean;
+  hermesHome: string;
+  configPath: string;
+  envPath: string;
+  configExists: boolean;
+  defaultModel: string | null;
   provider: string | null;
-  model: string | null;
-  text: string | null;
-  error: string | null;
+  baseUrl: string | null;
+  toolsets: string[];
+  fallbackProviders: string[];
+  configuredProviders: HermesProviderSummary[];
+  providersYaml: string;
+  notes: string[];
 };
 
-const PROVIDERS: AiModelProviderInfo[] = [
-  {
-    id: "anthropic",
-    name: "Anthropic (Claude)",
-    description: "Best for complex reasoning, long-form writing and precise instructions",
-    authType: "setup_token",
-    recommended: true,
-    placeholder: "sk-ant-...",
-    helpUrl: "https://console.anthropic.com/settings/keys",
-    helpText: "Get your API key from the Anthropic Console.",
-  },
-  {
-    id: "moonshot",
-    name: "Moonshot (Kimi)",
-    description: "Kimi K2.5 with 256K context window for complex reasoning and coding",
-    authType: "api_key",
-    popular: true,
-    placeholder: "sk-...",
-    helpUrl: "https://platform.moonshot.cn/console/api-keys",
-    helpText: "Get your API key from the Moonshot AI Platform.",
-  },
-  {
-    id: "openrouter",
-    name: "OpenRouter",
-    description: "One gateway to 200+ AI models. Ideal for flexibility and experimentation",
-    authType: "api_key",
-    popular: true,
-    placeholder: "sk-or-...",
-    helpUrl: "https://openrouter.ai/keys",
-    helpText: "Get your API key from OpenRouter.",
-  },
-  {
-    id: "nvidia",
-    name: "NVIDIA NIM",
-    description: "Access DeepSeek, Kimi, etc. via NVIDIA's free API",
-    authType: "api_key",
-    popular: true,
-    placeholder: "nvapi-...",
-    helpUrl: "https://build.nvidia.com/explore/discover",
-    helpText: "Get your free API key from NVIDIA Build.",
-  },
-  {
-    id: "ollama",
-    name: "Ollama",
-    description: "Run AI models locally or use Ollama Cloud for remote inference",
-    authType: "ollama",
-    localModels: true,
-    placeholder: "ollama-api-key...",
-    helpUrl: "https://ollama.com",
-    helpText: "Run models locally or sign in to Ollama Cloud.",
-  },
-  {
-    id: "openai",
-    name: "OpenAI (API Key)",
-    description: "Use your API key for chat, coding and everyday tasks",
-    authType: "api_key",
-    placeholder: "sk-...",
-    helpUrl: "https://platform.openai.com/api-keys",
-    helpText: "Get your API key from the OpenAI Platform.",
-  },
-  {
-    id: "openai-codex",
-    name: "ChatGPT (Subscription)",
-    description: "Use your ChatGPT subscription to access AI Agent",
-    authType: "oauth",
-    helpUrl: "https://openai.com/codex/",
-    helpText: "Automatically connect to your ChatGPT account and use the AI Agent at no extra cost.",
-  },
-  {
-    id: "google",
-    name: "Google (Gemini)",
-    description: "Strong with images, documents and large amounts of context",
-    authType: "api_key",
-    placeholder: "AIza...",
-    helpUrl: "https://aistudio.google.com/apikey",
-    helpText: "Get your API key from Google AI Studio.",
-  },
-  {
-    id: "venice",
-    name: "Venice AI",
-    description: "Privacy-focused AI with uncensored models",
-    authType: "api_key",
-    privacyFirst: true,
-    placeholder: "ven_...",
-    helpUrl: "https://venice.ai/settings/api",
-    helpText: "Get your API key from Venice AI Settings.",
-  },
-  {
-    id: "xai",
-    name: "xAI",
-    description: "High-performance reasoning model by xAI with web search capabilities",
-    authType: "api_key",
-    placeholder: "xai-***",
-    helpUrl: "https://console.x.ai/",
-    helpText: "Get your API key from the xAI Console.",
-  },
-  {
-    id: "zai",
-    name: "Z.ai (GLM)",
-    description: "Cost-effective models for everyday tasks and high-volume usage",
-    authType: "api_key",
-    placeholder: "sk-...",
-    helpUrl: "https://z.ai/manage-apikey/apikey-list",
-    helpText: "Get your API key from the Z.AI Platform.",
-  },
-  {
-    id: "minimax",
-    name: "MiniMax",
-    description: "Good for creative writing and expressive conversations",
-    authType: "api_key",
-    placeholder: "sk-...",
-    helpUrl: "https://platform.minimax.io/user-center/basic-information/interface-key",
-    helpText: "Get your API key from the MiniMax Platform.",
-  },
-  {
-    id: "kimi-coding",
-    name: "Kimi Coding",
-    description: "Dedicated coding endpoint with Kimi K2.5 optimized for development tasks",
-    authType: "api_key",
-    placeholder: "sk-...",
-    helpUrl: "https://www.kimi.com/code/en",
-    helpText: "Get your API key from the Kimi Coding Platform.",
-  },
-];
-
-const PROVIDER_IDS = new Set(PROVIDERS.map((provider) => provider.id));
-
-const ENV_VARS_BY_PROVIDER: Record<AiModelProviderId, string[]> = {
-  anthropic: ["ANTHROPIC_API_KEY"],
-  google: ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
-  nvidia: ["NVIDIA_API_KEY", "NVIDIA_NIM_API_KEY"],
-  ollama: ["OLLAMA_API_KEY"],
-  openai: ["OPENAI_API_KEY"],
-  "openai-codex": [],
-  openrouter: ["OPENROUTER_API_KEY"],
-  venice: ["VENICE_API_KEY"],
-  xai: ["XAI_API_KEY"],
-  zai: ["ZAI_API_KEY", "GLM_API_KEY"],
-  minimax: ["MINIMAX_API_KEY"],
-  moonshot: ["MOONSHOT_API_KEY"],
-  "kimi-coding": ["KIMI_CODING_API_KEY"],
+export type UpdateAiModelsInput = {
+  defaultModel: string;
+  provider: string;
+  baseUrl: string;
+  toolsets: string[];
+  fallbackProviders: string[];
+  providersYaml: string;
 };
 
-function asRecord(value: unknown): UnknownRecord | undefined {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as UnknownRecord)
-    : undefined;
+type HermesModelConfig = {
+  default?: string;
+  provider?: string;
+  base_url?: string;
+};
+
+type HermesYamlConfig = {
+  model?: string | HermesModelConfig;
+  provider?: string;
+  base_url?: string;
+  providers?: Record<string, unknown>;
+  fallback_providers?: unknown[];
+  toolsets?: unknown[];
+  [key: string]: unknown;
+};
+
+function readHermesHome(): string {
+  return process.env.HERMES_HOME?.trim() || join(homedir(), ".hermes");
 }
 
-function readString(value: unknown): string | null {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+function safeString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-function readNumber(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
+function requireString(value: string, field: string): string {
+  const next = value.trim();
+  if (!next) {
+    throw new Error(`${field} is required.`);
   }
-  return null;
-}
-
-function ensureRecord(parent: UnknownRecord, key: string): UnknownRecord {
-  const existing = asRecord(parent[key]);
-  if (existing) {
-    return existing;
-  }
-  const next: UnknownRecord = {};
-  parent[key] = next;
   return next;
 }
 
-function writeSanitizedTempConfig(): { path: string; cleanup: () => void } {
-  const tempDir = mkdtempSync(join(tmpdir(), "dench-ai-models-"));
-  const tempConfigPath = join(tempDir, "openclaw.json");
-  const tempConfig = asRecord(JSON.parse(readFileSync(join(resolveOpenClawStateDir(), "openclaw.json"), "utf-8"))) ?? {};
-  delete tempConfig.composio;
-  delete tempConfig.plugins;
-  writeFileSync(tempConfigPath, `${JSON.stringify(tempConfig, null, 2)}\n`, "utf-8");
-  return {
-    path: tempConfigPath,
-    cleanup: () => rmSync(tempDir, { force: true, recursive: true }),
-  };
+function safeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => safeString(item))
+    .filter((item): item is string => Boolean(item));
 }
 
-function authProfilesPath(): string {
-  return join(resolveOpenClawStateDir(), "agents", "main", "agent", "auth-profiles.json");
-}
-
-function readAuthProfiles(): { version: number; profiles: Record<string, unknown>; order: Record<string, string[]> } {
-  const filePath = authProfilesPath();
-  if (!existsSync(filePath)) {
-    return { version: 1, profiles: {}, order: {} };
-  }
+function readConfig(configPath: string): HermesYamlConfig | null {
+  if (!existsSync(configPath)) return null;
   try {
-    const parsed = JSON.parse(readFileSync(filePath, "utf-8")) as UnknownRecord;
-    return {
-      version: typeof parsed.version === "number" ? parsed.version : 1,
-      profiles: asRecord(parsed.profiles) ?? {},
-      order: Object.fromEntries(
-        Object.entries(asRecord(parsed.order) ?? {}).map(([key, value]) => [
-          key,
-          Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [],
-        ]),
-      ),
-    };
+    return YAML.parse(readFileSync(configPath, "utf-8")) as HermesYamlConfig;
   } catch {
-    return { version: 1, profiles: {}, order: {} };
-  }
-}
-
-function writeAuthProfiles(store: { version: number; profiles: Record<string, unknown>; order: Record<string, string[]> }) {
-  const filePath = authProfilesPath();
-  mkdirSync(join(resolveOpenClawStateDir(), "agents", "main", "agent"), { recursive: true });
-  writeFileSync(filePath, `${JSON.stringify(store, null, 2)}\n`, "utf-8");
-}
-
-function hasEnvCredential(providerId: AiModelProviderId): boolean {
-  return ENV_VARS_BY_PROVIDER[providerId].some((envVar) => {
-    const value = process.env[envVar];
-    return typeof value === "string" && value.trim().length > 0;
-  });
-}
-
-function isConfiguredFromConfig(config: UnknownRecord, providerId: AiModelProviderId): boolean {
-  const models = asRecord(config.models);
-  const providers = asRecord(models?.providers);
-  const provider = asRecord(providers?.[providerId]);
-  if (!provider) {
-    return false;
-  }
-  return Boolean(readString(provider.apiKey) || provider.apiKey || readString(provider.baseUrl));
-}
-
-function isConfiguredFromAuthProfiles(providerId: AiModelProviderId, store: { profiles: Record<string, unknown> }): boolean {
-  return Object.values(store.profiles).some((profile) => {
-    const record = asRecord(profile);
-    if (!record) {
-      return false;
-    }
-    return readString(record.provider) === providerId
-      && (Boolean(readString(record.key)) || Boolean(readString(record.token)));
-  });
-}
-
-function isProviderConfigured(config: UnknownRecord, providerId: AiModelProviderId, authStore: { profiles: Record<string, unknown> }): boolean {
-  return isConfiguredFromConfig(config, providerId)
-    || isConfiguredFromAuthProfiles(providerId, authStore)
-    || hasEnvCredential(providerId);
-}
-
-function resolveProviderIdFromModelKey(modelKey: string): AiModelProviderId | null {
-  const providerPrefix = modelKey.split("/", 1)[0]?.trim().toLowerCase();
-  if (!providerPrefix) {
     return null;
   }
-  if (PROVIDER_IDS.has(providerPrefix as AiModelProviderId)) {
-    return providerPrefix as AiModelProviderId;
-  }
-  return null;
 }
 
-async function readModelCatalog(): Promise<AiModelEntry[]> {
-  const temp = writeSanitizedTempConfig();
-
+function readCommandOutput(command: string, args: string[]): string | null {
   try {
-    const { stdout } = await execFileAsync("openclaw", ["--profile", "dench", "models", "list", "--all", "--json"], {
-      cwd: process.cwd(),
-      maxBuffer: 16 * 1024 * 1024,
-      env: {
-        ...process.env,
-        OPENCLAW_CONFIG_PATH: temp.path,
-      },
-    });
-    const payload = JSON.parse(stdout) as {
-      models?: Array<{
-        key?: string;
-        name?: string;
-        input?: string;
-        contextWindow?: number;
-        local?: boolean;
-        available?: boolean;
-        missing?: boolean;
-      }>;
-    };
-    const models = Array.isArray(payload.models) ? payload.models : [];
-    return models
-      .map((model) => {
-        const key = readString(model.key);
-        if (!key || !key.includes("/")) {
-          return null;
-        }
-        const providerId = resolveProviderIdFromModelKey(key);
-        const provider = key.split("/", 1)[0] ?? "";
-        const modelId = key.slice(provider.length + 1);
-        return {
-          key,
-          provider,
-          providerId,
-          modelId,
-          name: readString(model.name) ?? modelId,
-          input: readString(model.input) ?? "text",
-          contextWindow: readNumber(model.contextWindow),
-          available: model.available === true,
-          local: model.local === true,
-          missing: model.missing === true,
-        } satisfies AiModelEntry;
-      })
-      .filter((model): model is AiModelEntry => Boolean(model))
-      .filter((model) => model.providerId !== null);
-  } finally {
-    temp.cleanup();
+    return execFileSync(command, args, { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] }).trim() || null;
+  } catch {
+    return null;
   }
 }
 
-export async function testAiModelsRuntime(): Promise<AiModelsRuntimeTestResult> {
-  const temp = writeSanitizedTempConfig();
-  try {
-    const { stdout } = await execFileAsync(
-      "openclaw",
-      ["--profile", "dench", "agent", "--agent", "main", "--json", "-m", "Reply with exactly: pong", "--timeout", "45"],
-      {
-        cwd: process.cwd(),
-        maxBuffer: 16 * 1024 * 1024,
-        env: {
-          ...process.env,
-          OPENCLAW_CONFIG_PATH: temp.path,
-        },
-      },
-    );
-    const payload = JSON.parse(stdout) as {
-      result?: {
-        payloads?: Array<{ text?: string | null }>;
-        meta?: {
-          agentMeta?: {
-            provider?: string | null;
-            model?: string | null;
-          };
-        };
+function resolveCliPath(): string | null {
+  const locator = process.platform === "win32" ? "where" : "which";
+  const output = readCommandOutput(locator, ["hermes"]);
+  return output?.split(/\r?\n/)[0]?.trim() || null;
+}
+
+function normalizeProviders(raw: unknown): Record<string, unknown> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  return raw as Record<string, unknown>;
+}
+
+function resolveConfiguredProviders(config: HermesYamlConfig | null): HermesProviderSummary[] {
+  const providers = normalizeProviders(config?.providers);
+
+  return Object.entries(providers)
+    .map(([id, raw]) => {
+      const record = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
+      return {
+        id,
+        baseUrl: safeString(record.base_url) ?? safeString(record.baseUrl),
+        keys: Object.keys(record),
       };
-    };
-    return {
-      ok: true,
-      provider: readString(payload.result?.meta?.agentMeta?.provider) ?? null,
-      model: readString(payload.result?.meta?.agentMeta?.model) ?? null,
-      text: readString(payload.result?.payloads?.[0]?.text) ?? null,
-      error: null,
-    };
-  } catch (error) {
-    return {
-      ok: false,
-      provider: null,
-      model: null,
-      text: null,
-      error: error instanceof Error ? error.message : "Runtime test failed.",
-    };
-  } finally {
-    temp.cleanup();
-  }
+    })
+    .sort((a, b) => a.id.localeCompare(b.id));
 }
 
-function readPrimaryModel(config: UnknownRecord): string | null {
-  const agents = asRecord(config.agents);
-  const defaults = asRecord(agents?.defaults);
-  const model = defaults?.model;
-  if (typeof model === "string") {
-    return model.trim() || null;
-  }
-  return readString(asRecord(model)?.primary);
+function resolveDefaultModel(config: HermesYamlConfig | null): string | null {
+  if (!config?.model) return null;
+  if (typeof config.model === "string") return safeString(config.model);
+  return safeString(config.model.default);
 }
 
-function syncConfigAuthMetadata(
-  config: UnknownRecord,
-  params: { providerId: AiModelProviderId; profileId: string; mode: "api_key" | "token" },
-): void {
-  const auth = ensureRecord(config, "auth");
-  const profiles = ensureRecord(auth, "profiles");
-  profiles[params.profileId] = {
-    provider: params.providerId,
-    mode: params.mode,
-  };
-  const order = ensureRecord(auth, "order");
-  order[params.providerId] = [params.profileId];
+function resolveProvider(config: HermesYamlConfig | null): string | null {
+  if (!config?.model) return safeString(config?.provider);
+  if (typeof config.model === "string") return safeString(config?.provider);
+  return safeString(config.model.provider) ?? safeString(config.provider);
 }
 
-function writeApiProviderCredential(params: {
-  providerId: AiModelProviderId;
-  secret: string;
-  type: "api_key" | "token";
-}) {
-  const authStore = readAuthProfiles();
-  const profileId = `${params.providerId}:default`;
-  authStore.profiles[profileId] = params.type === "token"
-    ? { type: "token", provider: params.providerId, token: params.secret }
-    : { type: "api_key", provider: params.providerId, key: params.secret };
-  authStore.order[params.providerId] = [profileId];
-  writeAuthProfiles(authStore);
-
-  const config = readOpenClawConfigForIntegrations();
-  syncConfigAuthMetadata(config, {
-    providerId: params.providerId,
-    profileId,
-    mode: params.type,
-  });
-  writeOpenClawConfigForIntegrations(config);
+function resolveBaseUrl(config: HermesYamlConfig | null): string | null {
+  if (!config?.model) return safeString(config?.base_url);
+  if (typeof config.model === "string") return safeString(config?.base_url);
+  return safeString(config.model.base_url) ?? safeString(config.base_url);
 }
 
-function configureOllama(params: { baseUrl: string; apiKey: string }) {
-  const config = readOpenClawConfigForIntegrations();
-  const models = ensureRecord(config, "models");
-  models.mode = "merge";
-  const providers = ensureRecord(models, "providers");
-  providers.ollama = {
-    baseUrl: params.baseUrl,
-    api: "ollama",
-    apiKey: params.apiKey,
-    models: [],
-  };
-  syncConfigAuthMetadata(config, {
-    providerId: "ollama",
-    profileId: "ollama:default",
-    mode: "api_key",
-  });
-  writeOpenClawConfigForIntegrations(config);
-
-  const authStore = readAuthProfiles();
-  authStore.profiles["ollama:default"] = {
-    type: "api_key",
-    provider: "ollama",
-    key: params.apiKey,
-  };
-  authStore.order.ollama = ["ollama:default"];
-  writeAuthProfiles(authStore);
+function resolveProvidersYaml(config: HermesYamlConfig | null): string {
+  const providers = normalizeProviders(config?.providers);
+  return YAML.stringify(providers).trim() || "{}";
 }
 
-function savePrimaryModel(modelKey: string) {
-  const config = readOpenClawConfigForIntegrations();
-  const agents = ensureRecord(config, "agents");
-  const defaults = ensureRecord(agents, "defaults");
-  const model = ensureRecord(defaults, "model");
-  model.primary = modelKey;
-  const allowlist = ensureRecord(defaults, "models");
-  if (!asRecord(allowlist[modelKey])) {
-    allowlist[modelKey] = {};
-  }
-  writeOpenClawConfigForIntegrations(config);
-}
+function parseProvidersYaml(providersYaml: string): Record<string, unknown> {
+  const trimmed = providersYaml.trim();
+  if (!trimmed) return {};
 
-export async function getAiModelsState(params?: { provider?: string | null }): Promise<AiModelsPageState> {
-  const config = readOpenClawConfigForIntegrations();
-  const authStore = readAuthProfiles();
-  let models: AiModelEntry[] = [];
-  let warning: string | null = null;
   try {
-    models = await Promise.race([
-      readModelCatalog(),
-      new Promise<AiModelEntry[]>((_, reject) => {
-        setTimeout(() => reject(new Error("Timed out loading OpenClaw model catalog.")), 8000);
-      }),
-    ]);
-  } catch (error) {
-    warning = error instanceof Error
-      ? `OpenClaw catalog indisponivel no momento. Detalhe: ${error.message}`
-      : "OpenClaw catalog indisponivel no momento.";
-  }
-  const providerMap = new Map<AiModelProviderId, number>();
-  for (const model of models) {
-    if (!model.providerId) {
-      continue;
+    const parsed = YAML.parse(trimmed);
+    if (!parsed) return {};
+    if (typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("Providers YAML must parse to an object map.");
     }
-    providerMap.set(model.providerId, (providerMap.get(model.providerId) ?? 0) + 1);
+    return parsed as Record<string, unknown>;
+  } catch (error) {
+    throw new Error(error instanceof Error ? `Invalid providers YAML: ${error.message}` : "Invalid providers YAML.");
   }
-  const requestedProvider = typeof params?.provider === "string" && PROVIDER_IDS.has(params.provider as AiModelProviderId)
-    ? (params.provider as AiModelProviderId)
-    : null;
-  const primaryModel = readPrimaryModel(config);
-  const inferredProvider = primaryModel ? resolveProviderIdFromModelKey(primaryModel) : null;
+}
+
+function buildNotes(configExists: boolean, envPath: string, defaultModel: string | null, provider: string | null, cliPath: string | null): string[] {
+  const notes: string[] = [];
+  if (!cliPath) notes.push("Hermes CLI não encontrado no PATH.");
+  if (!configExists) notes.push("Arquivo ~/.hermes/config.yaml não encontrado.");
+  if (configExists && !defaultModel) notes.push("Nenhum model.default configurado no Hermes.");
+  if (configExists && !provider) notes.push("Nenhum provider padrão configurado no Hermes.");
+  if (existsSync(envPath)) notes.push("Arquivo ~/.hermes/.env detectado para credenciais adicionais.");
+  notes.push("Hermes config editing is enabled from this UI.");
+  notes.push("Esta seção lê e atualiza a configuração real do Hermes; não remove nem migra arquivos legados do workspace.");
+  return notes;
+}
+
+function buildState(config: HermesYamlConfig | null): AiModelsPageState {
+  const hermesHome = readHermesHome();
+  const configPath = join(hermesHome, "config.yaml");
+  const envPath = join(hermesHome, ".env");
+  const configExists = existsSync(configPath);
+  const cliPath = resolveCliPath();
+  const cliVersion = cliPath ? readCommandOutput("hermes", ["--version"]) : null;
+  const acpHelp = cliPath ? readCommandOutput("hermes", ["acp", "--help"]) : null;
+  const configuredProviders = resolveConfiguredProviders(config);
+  const defaultModel = resolveDefaultModel(config);
+  const provider = resolveProvider(config);
+  const baseUrl = resolveBaseUrl(config);
+  const fallbackProviders = safeStringArray(config?.fallback_providers);
+  const toolsets = safeStringArray(config?.toolsets);
+
   return {
-    providers: PROVIDERS.map((provider) => ({
-      ...provider,
-      configured: isProviderConfigured(config, provider.id, authStore),
-      modelCount: providerMap.get(provider.id) ?? 0,
-    })),
-    models,
-    selectedProvider: requestedProvider ?? inferredProvider,
-    primaryModel,
-    warning,
+    sectionLabel: "Hermes",
+    cliAvailable: Boolean(cliPath),
+    cliPath,
+    cliVersion,
+    acpAvailable: Boolean(acpHelp && acpHelp.includes("Start Hermes Agent in ACP mode")),
+    hermesHome,
+    configPath,
+    envPath,
+    configExists,
+    defaultModel,
+    provider,
+    baseUrl,
+    toolsets,
+    fallbackProviders,
+    configuredProviders,
+    providersYaml: resolveProvidersYaml(config),
+    notes: buildNotes(configExists, envPath, defaultModel, provider, cliPath),
   };
 }
 
-export async function saveProviderCredential(params: {
-  providerId: AiModelProviderId;
-  secret: string;
-  authType?: "api_key" | "token";
-}): Promise<AiModelsUpdateResult> {
-  writeApiProviderCredential({
-    providerId: params.providerId,
-    secret: params.secret,
-    type: params.authType === "token" ? "token" : "api_key",
-  });
-  const refresh = await refreshIntegrationsRuntime();
-  return {
-    state: await getAiModelsState({ provider: params.providerId }),
-    changed: true,
-    refresh,
-  };
+export async function getAiModelsState(): Promise<AiModelsPageState> {
+  const hermesHome = readHermesHome();
+  const configPath = join(hermesHome, "config.yaml");
+  return buildState(readConfig(configPath));
 }
 
-export async function saveOllamaProvider(params: {
-  baseUrl: string;
-  apiKey: string;
-}): Promise<AiModelsUpdateResult> {
-  configureOllama(params);
-  const refresh = await refreshIntegrationsRuntime();
-  return {
-    state: await getAiModelsState({ provider: "ollama" }),
-    changed: true,
-    refresh,
-  };
-}
+export async function updateAiModelsState(input: UpdateAiModelsInput): Promise<AiModelsPageState> {
+  const hermesHome = readHermesHome();
+  const configPath = join(hermesHome, "config.yaml");
+  const current = readConfig(configPath) ?? {};
+  const providers = parseProvidersYaml(input.providersYaml);
 
-export async function selectPrimaryModel(modelKey: string): Promise<AiModelsUpdateResult> {
-  savePrimaryModel(modelKey);
-  const refresh = await refreshIntegrationsRuntime();
-  const providerId = resolveProviderIdFromModelKey(modelKey);
-  return {
-    state: await getAiModelsState({ provider: providerId }),
-    changed: true,
-    refresh,
+  const next: HermesYamlConfig = {
+    ...current,
+    model: {
+      ...(typeof current.model === "object" && current.model ? current.model : {}),
+      default: requireString(input.defaultModel, "Default model"),
+      provider: requireString(input.provider, "Provider"),
+      base_url: input.baseUrl.trim(),
+    },
+    provider: requireString(input.provider, "Provider"),
+    base_url: input.baseUrl.trim(),
+    providers,
+    fallback_providers: input.fallbackProviders,
+    toolsets: input.toolsets,
   };
-}
 
-export { PROVIDERS as AI_MODEL_PROVIDERS };
+  mkdirSync(hermesHome, { recursive: true });
+  writeFileSync(configPath, YAML.stringify(next), "utf-8");
+
+  return buildState(next);
+}

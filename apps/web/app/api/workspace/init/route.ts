@@ -90,7 +90,7 @@ export async function POST(req: Request) {
   }
   if (body.path?.trim()) {
     return Response.json(
-      { error: "Custom workspace paths are currently disabled. Workspaces are created in ~/.openclaw-dench." },
+      { error: "Custom workspace paths are currently disabled. Workspaces are created in the Hermes-managed workspace root." },
       { status: 400 },
     );
   }
