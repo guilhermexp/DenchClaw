@@ -1,4 +1,4 @@
-import { finalizeMeetingUpload, type MeetingSource } from "@/lib/meetings";
+import { finalizeMeetingUpload, MeetingConfigurationError, type MeetingSource } from "@/lib/meetings";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -36,6 +36,12 @@ export async function POST(request: Request) {
     });
     return Response.json(result);
   } catch (error) {
+    if (error instanceof MeetingConfigurationError) {
+      return Response.json(
+        { error: error.message, missingKey: error.missingKey },
+        { status: 412 },
+      );
+    }
     return Response.json(
       { error: error instanceof Error ? error.message : "Failed to finalize meeting." },
       { status: 500 },

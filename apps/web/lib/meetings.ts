@@ -13,6 +13,17 @@ import {
 import { resolveMeetingsAiRuntimeConfig } from "@/lib/meetings-ai-settings";
 import { buildFileLink } from "@/lib/workspace-links";
 
+export class MeetingConfigurationError extends Error {
+  readonly missingKey: "DEEPGRAM_API_KEY" | "OPENROUTER_API_KEY";
+  constructor(missingKey: "DEEPGRAM_API_KEY" | "OPENROUTER_API_KEY") {
+    super(
+      `${missingKey} is not configured. Set it in Settings → Meetings AI or in your .env file.`,
+    );
+    this.name = "MeetingConfigurationError";
+    this.missingKey = missingKey;
+  }
+}
+
 export type MeetingSource = "record" | "import";
 
 export type MeetingStatus =
@@ -662,7 +673,7 @@ async function transcribeWithDeepgram(file: File, startedAt: string): Promise<{
   const runtimeConfig = resolveMeetingsAiRuntimeConfig();
   const apiKey = runtimeConfig.deepgramApiKey;
   if (!apiKey) {
-    throw new Error("DEEPGRAM_API_KEY is not configured.");
+    throw new MeetingConfigurationError("DEEPGRAM_API_KEY");
   }
 
   const model = runtimeConfig.deepgramModel || "nova-3";
@@ -752,7 +763,7 @@ async function openRouterChat(messages: Array<{ role: "system" | "user"; content
   const runtimeConfig = resolveMeetingsAiRuntimeConfig();
   const apiKey = runtimeConfig.openRouterApiKey;
   if (!apiKey) {
-    throw new Error("OPENROUTER_API_KEY is not configured.");
+    throw new MeetingConfigurationError("OPENROUTER_API_KEY");
   }
 
   const model = runtimeConfig.openRouterModel || "openai/gpt-4o-mini";
