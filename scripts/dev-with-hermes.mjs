@@ -81,8 +81,8 @@ const env = {
   PATH: [path.dirname(hermesPath), process.env.PATH || ""].filter(Boolean).join(path.delimiter),
 };
 
-const nextBin = process.platform === "win32" ? "npx.cmd" : "npx";
-const child = spawn(nextBin, ["next", "dev", "--port", "3010"], {
+const packageManager = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+const child = spawn(packageManager, ["exec", "next", "dev", "--port", "3010"], {
   cwd: workspacePath,
   stdio: "inherit",
   env,

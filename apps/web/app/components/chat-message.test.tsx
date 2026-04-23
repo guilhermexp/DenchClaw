@@ -28,13 +28,20 @@ vi.mock("./openui-assistant-renderer", () => ({
   OpenUiAssistantRenderer: ({
     code,
     contextString,
+    onContinueConversation,
   }: {
     code: string;
     contextString?: string | null;
+    onContinueConversation?: (message: string) => void;
   }) => (
     <div>
       <div data-testid="openui-renderer">{code}</div>
       {contextString ? <div data-testid="openui-context">{contextString}</div> : null}
+      {onContinueConversation ? (
+        <button type="button" onClick={() => onContinueConversation("OpenUI follow-up")}>
+          Continue OpenUI
+        </button>
+      ) : null}
     </div>
   ),
 }));
@@ -241,5 +248,28 @@ describe("ChatMessage", () => {
     );
 
     expect(screen.getByTestId("openui-context")).toHaveTextContent('{"foo":"bar"}');
+  });
+
+  it("forwards OpenUI follow-up actions to the chat pipeline", async () => {
+    const user = userEvent.setup();
+    const onContinueConversation = vi.fn();
+
+    render(
+      <ChatMessage
+        message={{
+          id: "assistant-openui-action",
+          role: "assistant",
+          parts: [{
+            type: "text",
+            text: 'root = Card([title])\ntitle = TextContent("Hello")',
+          }],
+        }}
+        onContinueConversation={onContinueConversation}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Continue OpenUI" }));
+
+    expect(onContinueConversation).toHaveBeenCalledWith("OpenUI follow-up");
   });
 });

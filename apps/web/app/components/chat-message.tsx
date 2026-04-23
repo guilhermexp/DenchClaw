@@ -1075,6 +1075,7 @@ type ChatMessageProps = {
 	message: UIMessage;
 	isStreaming?: boolean;
 	onSubagentClick?: (task: string) => void;
+	onContinueConversation?: (message: string) => void;
 	onFilePathClick?: FilePathClickHandler;
 	onComposioAction?: (action: ComposioChatAction) => void;
 	sessionId?: string | null;
@@ -1083,7 +1084,7 @@ type ChatMessageProps = {
 	copyable?: boolean;
 };
 
-export const ChatMessage = memo(function ChatMessage({ message, isStreaming, onSubagentClick, onFilePathClick, onComposioAction, sessionId, voicePlaybackEnabled = false, userHtmlMap, copyable = false }: ChatMessageProps) {
+export const ChatMessage = memo(function ChatMessage({ message, isStreaming, onSubagentClick, onContinueConversation, onFilePathClick, onComposioAction, sessionId, voicePlaybackEnabled = false, userHtmlMap, copyable = false }: ChatMessageProps) {
 	const isUser = message.role === "user";
 	const segments = useMemo(() => groupParts(message.parts), [message.parts]);
 	const speechText = useMemo(() => extractSpeechText(segments), [segments]);
@@ -1235,6 +1236,7 @@ export const ChatMessage = memo(function ChatMessage({ message, isStreaming, onS
 								code={openUiPayload.code}
 								contextString={openUiPayload.contextString}
 								isStreaming={isStreaming}
+								onContinueConversation={onContinueConversation}
 							/>
 						);
 					}

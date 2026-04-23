@@ -1,17 +1,41 @@
 "use client";
 
-import { Renderer } from "@openuidev/react-lang";
+import type { ActionEvent } from "@openuidev/react-lang";
+import { BuiltinActionType, Renderer } from "@openuidev/react-lang";
 import { openuiChatLibrary } from "@openuidev/react-ui/genui-lib";
+import { useCallback } from "react";
 
 export function OpenUiAssistantRenderer({
   code,
   contextString,
   isStreaming = false,
+  onContinueConversation,
 }: {
   code: string;
   contextString?: string | null;
   isStreaming?: boolean;
+  onContinueConversation?: (message: string) => void;
 }) {
+  const handleAction = useCallback(
+    (event: ActionEvent) => {
+      if (
+        event.type === BuiltinActionType.ContinueConversation &&
+        event.humanFriendlyMessage
+      ) {
+        onContinueConversation?.(event.humanFriendlyMessage);
+        return;
+      }
+
+      if (event.type === BuiltinActionType.OpenUrl) {
+        const url = event.params?.["url"];
+        if (typeof window !== "undefined" && typeof url === "string") {
+          window.open(url, "_blank", "noopener,noreferrer");
+        }
+      }
+    },
+    [onContinueConversation],
+  );
+
   return (
     <div className="space-y-2" data-testid="openui-assistant-wrapper">
       <div className="openui-chat-surface rounded-2xl overflow-hidden border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-3">
@@ -19,6 +43,7 @@ export function OpenUiAssistantRenderer({
           response={code}
           library={openuiChatLibrary}
           isStreaming={isStreaming}
+          onAction={handleAction}
         />
       </div>
       {contextString ? (

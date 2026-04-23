@@ -1851,6 +1851,13 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(
 			}
 		}, [status, queuedMessages, handleEditorSubmit]);
 
+		const handleOpenUiContinueConversation = useCallback(
+			(message: string) => {
+				void handleEditorSubmit(message, [], "");
+			},
+			[handleEditorSubmit],
+		);
+
 		const handleSessionSelect = useCallback(
 			async (sessionId: string) => {
 				if (sessionId === currentSessionId) {
@@ -2583,6 +2590,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(
 								message={message}
 								isStreaming={isStreaming && i === messages.length - 1}
 								onSubagentClick={onSubagentClick}
+								onContinueConversation={handleOpenUiContinueConversation}
 								onFilePathClick={onFilePathClick}
 								onComposioAction={onComposioAction}
 								sessionId={currentSessionId}
